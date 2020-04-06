@@ -5,11 +5,13 @@ const ctx = canvas.getContext('2d')
 const images = {
   board: 'images/zoey.png',
   player1: 'images/xwing2.png',
+  bullet1: 'images/bulletBuenos.png',
 }
 
 //Variables globales
 let frames = 0
 let interval
+const shoots = []
 
 //Clases
 class Board {
@@ -56,6 +58,25 @@ class Player {
   goRight() {
     this.x += 20
   }
+  shoot() {
+    const gun = new Bullet(this.x, this.y, this.width, this.height)
+    shoots.push(gun)
+  }
+}
+
+class Bullet {
+  constructor(x, y) {
+    this.x = x
+    this.y = y
+    this.width = 100
+    this.height = 100
+    this.img = new Image()
+    this.img.src = images.bullet1
+  }
+  draw() {
+    this.x += 5
+    ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
+  }
 }
 
 // Objetos a instanciar
@@ -69,6 +90,7 @@ function update() {
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   background.draw()
   player1.draw()
+  drawShoots()
 }
 
 function startGame() {
@@ -79,6 +101,12 @@ function startGame() {
 function gameOver() {
   clearInterval(interval)
 }
+
+function drawShoots() {
+  shoots.forEach((shoot) => shoot.draw())
+  console.log('dispara?')
+}
+
 // funciones auxiliares
 
 window.onload = function () {
@@ -101,5 +129,7 @@ document.addEventListener('keyup', (e) => {
     case 83:
       player1.goDown()
       break
+    case 74:
+      player1.shoot()
   }
 })
