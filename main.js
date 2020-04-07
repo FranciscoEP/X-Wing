@@ -6,12 +6,14 @@ const images = {
   board: 'images/zoey.png',
   player1: 'images/xwing2.png',
   bullet1: 'images/bulletBuenos.png',
+  enemy: 'images/Caza.png',
 }
 
 //Variables globales
 let frames = 0
 let interval
 const shoots = []
+const ties = []
 
 //Clases
 class Board {
@@ -62,26 +64,68 @@ class Player {
     const gun = new Bullet(this.x, this.y, this.width, this.height)
     shoots.push(gun)
   }
+  limite() {
+    if (this.x > 620) {
+      return (this.x -= 10)
+    } else if (this.x < 10) {
+      return (this.x += 10)
+    } else if (this.y > 380) {
+      return (this.y -= 10)
+    } else if (this.y < 10) {
+      return (this.y += 10)
+    }
+  }
 }
 
 class Bullet {
   constructor(x, y) {
     this.x = x
     this.y = y
-    this.width = 100
+    this.width = 300
     this.height = 100
     this.img = new Image()
     this.img.src = images.bullet1
   }
   draw() {
-    this.x += 5
+    this.x += 15
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
+  }
+}
+
+class Enemy {
+  constructor(x, y) {
+    this.x = x
+    this.y = y
+    this.width = 100
+    this.height = 100
+    this.img = new Image()
+    this.img.src = images.enemy
+  }
+  draw() {
+    this.x--
+    ctx.drawImage(this.img, this.x, this.y + this.height, this.width, this.height)
+  }
+  shoot() {
+    const gun = new Bullet(this.x, this.y, this.width, this.height)
+    shoots.push(gun)
+  }
+  limite() {
+    if (this.x > 620) {
+      return (this.x -= 10)
+    } else if (this.x < 10) {
+      return (this.x += 10)
+    } else if (this.y > 380) {
+      return (this.y -= 10)
+    } else if (this.y < 10) {
+      return (this.y += 10)
+    }
   }
 }
 
 // Objetos a instanciar
 const background = new Board()
 const player1 = new Player()
+const tie = new Enemy()
 
 // funciones principales
 
@@ -90,7 +134,11 @@ function update() {
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   background.draw()
   player1.draw()
+  player1.limite()
   drawShoots()
+  generateEnemies()
+  drawEnemies()
+  tie.limite()
 }
 
 function startGame() {
@@ -104,7 +152,21 @@ function gameOver() {
 
 function drawShoots() {
   shoots.forEach((shoot) => shoot.draw())
-  console.log('dispara?')
+  console.log('Hasta 100 frames')
+}
+
+function generateEnemies() {
+  if (frames % 100 === 0) {
+    const random = Math.floor(Math.random() * canvas.height)
+    ties.push(new Enemy(canvas.width, random))
+    ties.limite()
+  }
+}
+
+function drawEnemies() {
+  ties.forEach((caza) => caza.draw())
+  if (frames % 60 === 0) {
+  }
 }
 
 // funciones auxiliares
