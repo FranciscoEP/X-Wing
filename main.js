@@ -47,6 +47,7 @@ class Player {
     this.height = 100
     this.img = new Image()
     this.img.src = sprite
+    this.hp = 5
   }
   draw() {
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
@@ -92,7 +93,7 @@ class Bullet {
   constructor(x, y) {
     this.x = x
     this.y = y
-    this.width = 30
+    this.width = 20
     this.height = 10
     this.img = new Image()
     this.img.src = images.bullet1
@@ -115,11 +116,19 @@ class Enemy {
   }
   draw() {
     this.x--
-    ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
+    ctx.drawImage(this.img, this.x, this.y - 50, this.width, this.height)
   }
   shoot() {
     const gun = new Pewpew(this.x, this.y)
     pewpews.push(gun)
+  }
+  istouching(thing) {
+    return (
+      this.x < thing.x + thing.width &&
+      this.x + this.width > thing.x &&
+      this.y < thing.y + thing.height &&
+      this.y + this.height > thing.y
+    )
   }
 }
 
@@ -133,7 +142,7 @@ class Pewpew {
     this.img.src = images.bullet2
   }
   draw() {
-    this.x -= 15
+    this.x -= 30
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
   }
 }
@@ -141,6 +150,7 @@ class Pewpew {
 // Objetos a instanciar
 const background = new Board()
 const player1 = new Player(200, 300, images.player1)
+
 // const player2 = new Player(100, 300, images.player2)
 
 // funciones principales
@@ -157,6 +167,7 @@ function update() {
   generateEnemies()
   drawEnemies()
   checkCollision()
+  checkCollision2()
 }
 
 function startGame() {
@@ -184,7 +195,6 @@ function generateEnemies() {
 
 function drawPewpew() {
   pewpews.forEach((pewpew) => pewpew.draw())
-  console.log('pewpew')
 }
 
 function drawEnemies() {
@@ -194,8 +204,18 @@ function drawEnemies() {
 
 function checkCollision() {
   pewpews.forEach((pewpew) => {
-    if (player1.istouching(pewpew)) return gameOver()
+    if (player1.istouching(pewpew)) return (player1.hp -= 1)
+    if (player1.hp <= 0) return gameOver()
   })
+}
+
+function checkCollision2() {
+  shoots.forEach((shoot, i) => {
+    ties.forEach((tie) => {
+      if (tie.istouching(shoot)) return ties.splice(1, i)
+    })
+  })
+  console.log('borrate')
 }
 
 // funciones auxiliares
