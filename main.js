@@ -5,6 +5,7 @@ const ctx = canvas.getContext('2d')
 const images = {
   board: 'images/zoey.png',
   player1: 'images/xwing2.png',
+  player2: 'images/Ejemplo-playe-2.png.png',
   bullet1: 'images/bulletBuenos.png',
   bullet2: 'images/BulletMalos.png',
   enemy: 'images/Caza.png',
@@ -39,13 +40,13 @@ class Board {
 }
 
 class Player {
-  constructor() {
-    this.x = 200
-    this.y = 320
+  constructor(x, y, sprite) {
+    this.x = x
+    this.y = y
     this.width = 100
     this.height = 100
     this.img = new Image()
-    this.img.src = images.player1
+    this.img.src = sprite
   }
   draw() {
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
@@ -77,20 +78,29 @@ class Player {
       return (this.y += 10)
     }
   }
+  istouching(thing) {
+    return (
+      this.x < thing.x + thing.width &&
+      this.x + this.width > thing.x &&
+      this.y < thing.y + thing.height &&
+      this.y + this.height > thing.y
+    )
+  }
 }
 
 class Bullet {
   constructor(x, y) {
     this.x = x
     this.y = y
-    this.width = 300
-    this.height = 100
+    this.width = 30
+    this.height = 10
     this.img = new Image()
     this.img.src = images.bullet1
   }
   draw() {
     this.x += 15
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
+    ctx.drawImage(this.img, this.x, this.y + 90, this.width, this.height)
   }
 }
 
@@ -117,8 +127,8 @@ class Pewpew {
   constructor(x, y) {
     this.x = x
     this.y = y
-    this.width = 500
-    this.height = 100
+    this.width = 30
+    this.height = 5
     this.img = new Image()
     this.img.src = images.bullet2
   }
@@ -130,7 +140,8 @@ class Pewpew {
 
 // Objetos a instanciar
 const background = new Board()
-const player1 = new Player()
+const player1 = new Player(200, 300, images.player1)
+// const player2 = new Player(100, 300, images.player2)
 
 // funciones principales
 
@@ -140,9 +151,12 @@ function update() {
   background.draw()
   player1.draw()
   player1.limite()
+  // player2.draw()
+  // player2.limite()
   drawShoots()
   generateEnemies()
   drawEnemies()
+  checkCollision()
 }
 
 function startGame() {
@@ -159,7 +173,7 @@ function drawShoots() {
 }
 
 function generateEnemies() {
-  if (frames % 200 === 0) {
+  if (frames % 60 === 0) {
     const random = Math.floor(Math.random() * canvas.height)
     const newEnemy = new Enemy(canvas.width, random)
     ties.push(newEnemy)
@@ -175,6 +189,13 @@ function drawPewpew() {
 
 function drawEnemies() {
   ties.forEach((caza) => caza.draw())
+  drawPewpew()
+}
+
+function checkCollision() {
+  pewpews.forEach((pewpew) => {
+    if (player1.istouching(pewpew)) return gameOver()
+  })
 }
 
 // funciones auxiliares
@@ -201,5 +222,20 @@ document.addEventListener('keyup', (e) => {
       break
     case 74:
       player1.shoot()
+      break
+    case 38:
+      player2.goUp()
+      break
+    case 39:
+      player2.goLeft()
+      break
+    case 37:
+      player2.goRight()
+      break
+    case 40:
+      player2.goDown()
+      break
+    case 76:
+      player2.shoot()
   }
 })
