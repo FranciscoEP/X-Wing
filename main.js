@@ -17,7 +17,8 @@ let interval
 const shoots = []
 const ties = []
 const pewpews = []
-
+const keys = []
+const friction = 0.8
 //Clases
 class Board {
   constructor() {
@@ -48,6 +49,9 @@ class Player {
     this.img = new Image()
     this.img.src = sprite
     this.hp = 10
+    this.speed = 5
+    this.velX = 0
+    this.velY = 0
   }
   draw() {
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
@@ -161,8 +165,10 @@ function update() {
   background.draw()
   player1.draw()
   player1.limite()
+  movePlayer1()
   player2.draw()
   player2.limite()
+  movePlayer2()
   drawShoots()
   generateEnemies()
   drawEnemies()
@@ -207,10 +213,6 @@ function generateEnemies() {
     newEnemy.shoot()
     console.log('Enemigo ', ties.length)
   }
-}
-
-function enemieBullets() {
-  ties.forEach((tie) => {})
 }
 
 function drawPewpew() {
@@ -275,36 +277,112 @@ window.onload = function () {
   }
 }
 
+function movePlayer1() {
+  if (keys[68]) {
+    if (player1.velX < player1.speed) {
+      player1.velX++
+    }
+  }
+  if (keys[65]) {
+    if (player1.velX > -player1.speed) {
+      player1.velX--
+    }
+  }
+  if (keys[83]) {
+    if (player1.velY < player1.speed) {
+      player1.velY++
+    }
+  }
+  if (keys[87]) {
+    if (player1.velY > -player1.speed) {
+      player1.velY--
+    }
+  }
+  player1.x += player1.velX
+  player1.velX *= friction
+
+  player1.y += player1.velY
+  player1.velY *= friction
+}
+
+function movePlayer2() {
+  if (keys[39]) {
+    if (player2.velX < player2.speed) {
+      player2.velX++
+    }
+  }
+  if (keys[37]) {
+    if (player2.velX > -player2.speed) {
+      player2.velX--
+    }
+  }
+  if (keys[40]) {
+    if (player2.velY < player2.speed) {
+      player2.velY++
+    }
+  }
+  if (keys[38]) {
+    if (player2.velY > -player2.speed) {
+      player2.velY--
+    }
+  }
+  player2.x += player2.velX
+  player2.velX *= friction
+
+  player2.y += player2.velY
+  player2.velY *= friction
+}
+
+document.body.addEventListener('keydown', (e) => {
+  keys[e.keyCode] = true
+})
+
+//para movimiento
+document.body.addEventListener('keyup', (e) => {
+  keys[e.keyCode] = false
+})
+
 document.addEventListener('keydown', (e) => {
   switch (e.keyCode) {
-    case 87:
-      player1.goUp()
-      break
-    case 65:
-      player1.goLeft()
-      break
-    case 68:
-      player1.goRight()
-      break
-    case 83:
-      player1.goDown()
-      break
     case 74:
       player1.shoot()
       break
-    case 38:
-      player2.goUp()
-      break
-    case 37:
-      player2.goLeft()
-      break
-    case 39:
-      player2.goRight()
-      break
-    case 40:
-      player2.goDown()
-      break
     case 76:
       player2.shoot()
+      break
   }
 })
+
+// document.addEventListener('keydown', (e) => {
+//   switch (e.keyCode) {
+//     case 87:
+//       player1.goUp()
+//       break
+//     case 65:
+//       player1.goLeft()
+//       break
+//     case 68:
+//       player1.goRight()
+//       break
+//     case 83:
+//       player1.goDown()
+//       break
+//     case 74:
+//       player1.shoot()
+//       break
+//     case 38:
+//       player2.goUp()
+//       break
+//     case 37:
+//       player2.goLeft()
+//       break
+//     case 39:
+//       player2.goRight()
+//       break
+//     case 40:
+//       player2.goDown()
+//       break
+//     case 76:
+//       player2.shoot()
+//   }
+// })
