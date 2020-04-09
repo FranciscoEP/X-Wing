@@ -186,14 +186,14 @@ class Hp1 {
     if (lifeP1 === 3) this.img.src = 'images/34.png'
     if (lifeP1 === 6) this.img.src = 'images/medium.png'
     if (lifeP1 === 9) this.img.src = 'images/almost-done.png'
-    if (lifeP1 >= 10) this.img.src = 'images/donep.png'
+    if (lifeP1 === 10) this.img.src = 'images/donep.png'
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
   }
 }
 
 class Hp2 {
   constructor() {
-    this.x = 300
+    this.x = 400
     this.y = 0
     this.width = 100
     this.height = 50
@@ -205,7 +205,7 @@ class Hp2 {
     if (lifeP2 === 3) this.img.src = 'images/Blue1.png'
     if (lifeP2 === 6) this.img.src = 'images/Blue2.png'
     if (lifeP2 === 9) this.img.src = 'images/Blue3.png'
-    if (lifeP2 >= 10) this.img.src = 'images/Blue4.png'
+    if (lifeP2 === 10) this.img.src = 'images/Blue4.png'
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
   }
 }
@@ -245,11 +245,11 @@ function startGame() {
 }
 function winTheGame() {
   if (player1.hp <= 0) {
-    ctx.fillStyle = 'red'
+    ctx.fillStyle = 'lightblue'
     ctx.font = '40px Georgia'
     ctx.fillText('Player 2 has won the game', 150, 150)
   } else if (player2.hp <= 0) {
-    ctx.fillStyle = 'lightblue'
+    ctx.fillStyle = 'red'
     ctx.font = '40px Georgia'
     ctx.fillText('Player 1 has won the game', 150, 150)
   }
