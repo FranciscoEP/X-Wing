@@ -11,6 +11,10 @@ const images = {
   enemy: 'images/Caza.png',
 }
 
+const sounds = {
+  pewPew: 'images/scifi002.mp3',
+}
+
 //Variables globales
 let frames = 0
 let interval
@@ -19,6 +23,8 @@ const ties = []
 const pewpews = []
 const keys = []
 const friction = 0.8
+let lifeP1 = 0
+let lifeP2 = 0
 //Clases
 class Board {
   constructor() {
@@ -48,7 +54,7 @@ class Player {
     this.height = 100
     this.img = new Image()
     this.img.src = sprite
-    this.hp = 10
+    this.hp = 100
     this.speed = 5
     this.velX = 0
     this.velY = 0
@@ -56,6 +62,7 @@ class Player {
   draw() {
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
   }
+
   goUp() {
     this.y -= 20
   }
@@ -97,7 +104,7 @@ class Bullet {
   constructor(x, y) {
     this.x = x
     this.y = y
-    this.width = 20
+    this.width = 30
     this.height = 10
     this.img = new Image()
     this.img.src = images.bullet1
@@ -112,7 +119,7 @@ class Bullet {
 class Enemy {
   constructor(x, y) {
     this.x = x
-    this.y = y - 100
+    this.y = y
     this.width = 100
     this.height = 100
     this.img = new Image()
@@ -142,13 +149,64 @@ class Pewpew {
     this.x = x
     this.y = y
     this.width = 30
-    this.height = 5
+    this.height = 10
     this.img = new Image()
     this.img.src = images.bullet2
   }
   draw() {
     this.x -= 30
-    ctx.drawImage(this.img, this.x, this.y + 50, this.width, this.height)
+    ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
+  }
+}
+
+class Sounds {
+  constructor(sound, lvl) {
+    this.audio = new Audio(source)
+    this.audio.lvl = lvl
+  }
+  play() {
+    this.audio.play()
+  }
+  pause() {
+    this.audio.pause()
+  }
+}
+
+class Hp1 {
+  constructor() {
+    this.x = 200
+    this.y = 0
+    this.width = 100
+    this.height = 50
+    this.img = new Image()
+    this.img.src = 'images/Full.png'
+  }
+  draw() {
+    if (lifeP1 === 0) this.img.src = 'images/Full.png'
+    if (lifeP1 === 3) this.img.src = 'images/34.png'
+    if (lifeP1 === 6) this.img.src = 'images/medium.png'
+    if (lifeP1 === 9) this.img.src = 'images/almost-done.png'
+    if (lifeP1 >= 10) this.img.src = 'images/donep.png'
+    ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
+  }
+}
+
+class Hp2 {
+  constructor() {
+    this.x = 250
+    this.y = 0
+    this.width = 100
+    this.height = 50
+    this.img = new Image()
+    this.img.src = 'images/Blue.png'
+  }
+  draw() {
+    if (lifeP2 === 0) this.img.src = 'images/Blue.png'
+    if (lifeP2 === 3) this.img.src = 'images/Blue1.png'
+    if (lifeP2 === 6) this.img.src = 'images/Blue2.png'
+    if (lifeP2 === 9) this.img.src = 'images/Blue3.png'
+    if (lifeP2 >= 10) this.img.src = 'images/Blue4.png'
+    ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
   }
 }
 
@@ -156,7 +214,9 @@ class Pewpew {
 const background = new Board()
 const player1 = new Player(200, 300, images.player1)
 const player2 = new Player(200, 100, images.player2)
-
+const pewPewSound = new Audio('Sounds/scifi002.mp3', 0.5)
+const hp1 = new Hp1()
+const hp2 = new Hp2()
 // funciones principales
 
 function update() {
@@ -175,6 +235,8 @@ function update() {
   checkCollisionP1()
   checkCollisionP2()
   checkCollision2()
+  hp1.draw()
+  hp2.draw()
 }
 
 function startGame() {
@@ -187,7 +249,7 @@ function winTheGame() {
     ctx.font = '40px Georgia'
     ctx.fillText('Player 2 has won the game', 150, 150)
   } else if (player2.hp <= 0) {
-    ctx.fillStyle = 'red'
+    ctx.fillStyle = 'lightblue'
     ctx.font = '40px Georgia'
     ctx.fillText('Player 1 has won the game', 150, 150)
   }
@@ -206,8 +268,8 @@ function drawShoots() {
 function generateEnemies() {
   /*generar varios disparos*/
 
-  if (frames % 60 === 0) {
-    const random = Math.floor(Math.random() * canvas.height)
+  if (frames % 30 === 0) {
+    const random = Math.floor(Math.random() * canvas.height - 100)
     const newEnemy = new Enemy(canvas.width, random)
     ties.push(newEnemy)
     newEnemy.shoot()
@@ -227,9 +289,9 @@ function drawEnemies() {
 function checkCollisionP1() {
   pewpews.forEach((pewpew, indexPewpew) => {
     if (player1.istouching(pewpew)) {
-      player1.hp -= 1
+      player1.hp -= 10
       pewpews.splice(1, indexPewpew)
-
+      lifeP1++
       console.log('Te quedan ' + player1.hp)
     }
 
@@ -240,9 +302,9 @@ function checkCollisionP1() {
 function checkCollisionP2() {
   pewpews.forEach((pewpew, indexPewpew) => {
     if (player2.istouching(pewpew)) {
-      player2.hp -= 1
+      player2.hp -= 10
       pewpews.splice(1, indexPewpew)
-
+      lifeP2++
       console.log('Te quedan ' + player2.hp)
     }
 
@@ -346,9 +408,12 @@ document.addEventListener('keydown', (e) => {
   switch (e.keyCode) {
     case 74:
       player1.shoot()
+      pewPewSound.play()
       break
     case 76:
       player2.shoot()
+      pewPewSound.play()
+
       break
   }
 })
