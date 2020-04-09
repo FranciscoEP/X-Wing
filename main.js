@@ -5,7 +5,7 @@ const ctx = canvas.getContext('2d')
 const images = {
   board: 'images/zoey.png',
   player1: 'images/xwing2.png',
-  player2: 'images/Ejemplo-playe-2.png.png',
+  player2: 'images/Player2.png',
   bullet1: 'images/bulletBuenos.png',
   bullet2: 'images/BulletMalos.png',
   enemy: 'images/Caza.png',
@@ -47,7 +47,7 @@ class Player {
     this.height = 100
     this.img = new Image()
     this.img.src = sprite
-    this.hp = 5
+    this.hp = 10
   }
   draw() {
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
@@ -99,7 +99,7 @@ class Bullet {
     this.img.src = images.bullet1
   }
   draw() {
-    this.x += 15
+    this.x += 35
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
     ctx.drawImage(this.img, this.x, this.y + 90, this.width, this.height)
   }
@@ -108,7 +108,7 @@ class Bullet {
 class Enemy {
   constructor(x, y) {
     this.x = x
-    this.y = y
+    this.y = y - 100
     this.width = 100
     this.height = 100
     this.img = new Image()
@@ -116,11 +116,12 @@ class Enemy {
   }
   draw() {
     this.x--
-    ctx.drawImage(this.img, this.x, this.y - 50, this.width, this.height)
+    ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
   }
   shoot() {
-    const gun = new Pewpew(this.x, this.y)
-    pewpews.push(gun)
+    pewpews.push(new Pewpew(this.x - 100, this.y))
+    pewpews.push(new Pewpew(this.x - 200, this.y))
+    pewpews.push(new Pewpew(this.x, this.y))
   }
   istouching(thing) {
     return (
@@ -143,15 +144,14 @@ class Pewpew {
   }
   draw() {
     this.x -= 30
-    ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
+    ctx.drawImage(this.img, this.x, this.y + 50, this.width, this.height)
   }
 }
 
 // Objetos a instanciar
 const background = new Board()
 const player1 = new Player(200, 300, images.player1)
-
-// const player2 = new Player(100, 300, images.player2)
+const player2 = new Player(200, 100, images.player2)
 
 // funciones principales
 
@@ -161,12 +161,13 @@ function update() {
   background.draw()
   player1.draw()
   player1.limite()
-  // player2.draw()
-  // player2.limite()
+  player2.draw()
+  player2.limite()
   drawShoots()
   generateEnemies()
   drawEnemies()
-  checkCollision()
+  checkCollisionP1()
+  checkCollisionP2()
   checkCollision2()
 }
 
@@ -174,9 +175,22 @@ function startGame() {
   if (interval) return
   interval = setInterval(update, 1000 / 60)
 }
-
+function winTheGame() {
+  if (player1.hp <= 0) {
+    ctx.fillStyle = 'red'
+    ctx.font = '40px Georgia'
+    ctx.fillText('Player 2 has won the game', 150, 150)
+  } else if (player2.hp <= 0) {
+    ctx.fillStyle = 'red'
+    ctx.font = '40px Georgia'
+    ctx.fillText('Player 1 has won the game', 150, 150)
+  }
+}
 function gameOver() {
   clearInterval(interval)
+  console.log('perdiste')
+
+  winTheGame()
 }
 
 function drawShoots() {
@@ -184,6 +198,8 @@ function drawShoots() {
 }
 
 function generateEnemies() {
+  /*generar varios disparos*/
+
   if (frames % 60 === 0) {
     const random = Math.floor(Math.random() * canvas.height)
     const newEnemy = new Enemy(canvas.width, random)
@@ -191,6 +207,10 @@ function generateEnemies() {
     newEnemy.shoot()
     console.log('Enemigo ', ties.length)
   }
+}
+
+function enemieBullets() {
+  ties.forEach((tie) => {})
 }
 
 function drawPewpew() {
@@ -202,21 +222,50 @@ function drawEnemies() {
   drawPewpew()
 }
 
-function checkCollision() {
-  pewpews.forEach((pewpew) => {
-    if (player1.istouching(pewpew)) return (player1.hp -= 1)
-    if (player1.hp <= 0) return gameOver()
+function checkCollisionP1() {
+  pewpews.forEach((pewpew, indexPewpew) => {
+    if (player1.istouching(pewpew)) {
+      player1.hp -= 1
+      pewpews.splice(1, indexPewpew)
+
+      console.log('Te quedan ' + player1.hp)
+    }
+
+    if (player1.hp === 0) return gameOver()
+  })
+}
+
+function checkCollisionP2() {
+  pewpews.forEach((pewpew, indexPewpew) => {
+    if (player2.istouching(pewpew)) {
+      player2.hp -= 1
+      pewpews.splice(1, indexPewpew)
+
+      console.log('Te quedan ' + player2.hp)
+    }
+
+    if (player2.hp === 0) return gameOver()
   })
 }
 
 function checkCollision2() {
-  shoots.forEach((shoot, i) => {
-    ties.forEach((tie) => {
-      if (tie.istouching(shoot)) return ties.splice(1, i)
+  shoots.forEach((shoot, indexShoots) => {
+    ties.forEach((tie, indexTies) => {
+      if (tie.istouching(shoot)) {
+        shoots.splice(indexShoots, 1)
+        ties.splice(indexTies, 1)
+      }
     })
   })
-  console.log('borrate')
 }
+
+// function checkCollision2() {
+//   shoots.forEach((shoot, shootIndex) => {
+//     ties.forEach((tie) => {
+//       if (tie.istouching(shoot)) return shoots.splice(1, i)
+//     })
+//   })
+// }
 
 // funciones auxiliares
 
@@ -226,7 +275,7 @@ window.onload = function () {
   }
 }
 
-document.addEventListener('keyup', (e) => {
+document.addEventListener('keydown', (e) => {
   switch (e.keyCode) {
     case 87:
       player1.goUp()
@@ -246,10 +295,10 @@ document.addEventListener('keyup', (e) => {
     case 38:
       player2.goUp()
       break
-    case 39:
+    case 37:
       player2.goLeft()
       break
-    case 37:
+    case 39:
       player2.goRight()
       break
     case 40:
