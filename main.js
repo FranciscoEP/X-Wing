@@ -193,7 +193,7 @@ class Hp1 {
 
 class Hp2 {
   constructor() {
-    this.x = 250
+    this.x = 300
     this.y = 0
     this.width = 100
     this.height = 50
