@@ -9,7 +9,6 @@ const images = {
   bullet1: 'images/bulletBuenos.png',
   bullet2: 'images/BulletMalos.png',
   enemy: 'images/Caza.png',
-  instructions: 'images/Instructions',
 }
 
 const sounds = {
