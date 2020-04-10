@@ -9,10 +9,13 @@ const images = {
   bullet1: 'images/bulletBuenos.png',
   bullet2: 'images/BulletMalos.png',
   enemy: 'images/Caza.png',
+  instructions: 'images/Instructions',
 }
 
 const sounds = {
-  pewPew: 'images/scifi002.mp3',
+  pewPew: 'Sounds/scifi002.mp3',
+  mainTitle: 'Sounds/main-title.mp3',
+  death: 'Sounds/R2D2.mp3',
 }
 
 //Variables globales
@@ -161,7 +164,7 @@ class Pewpew {
 
 class Sounds {
   constructor(sound, lvl) {
-    this.audio = new Audio(source)
+    this.audio = new Audio(sound)
     this.audio.lvl = lvl
   }
   play() {
@@ -214,7 +217,9 @@ class Hp2 {
 const background = new Board()
 const player1 = new Player(200, 300, images.player1)
 const player2 = new Player(200, 100, images.player2)
-const pewPewSound = new Audio('Sounds/scifi002.mp3', 0.5)
+const pewPewSound = new Audio(sounds.pewPewSound, 0.1)
+const mainTitle = new Audio(sounds.mainTitle, 0.1)
+const finalSound = new Audio(sounds.death, 0.1)
 const hp1 = new Hp1()
 const hp2 = new Hp2()
 // funciones principales
@@ -242,7 +247,13 @@ function update() {
 function startGame() {
   if (interval) return
   interval = setInterval(update, 1000 / 60)
+  mainTitle.play()
 }
+
+function reloadGame() {
+  location.reload()
+}
+
 function winTheGame() {
   if (player1.hp <= 0) {
     ctx.fillStyle = 'lightblue'
@@ -257,8 +268,9 @@ function winTheGame() {
 function gameOver() {
   clearInterval(interval)
   console.log('perdiste')
-
   winTheGame()
+  mainTitle.pause()
+  finalSound.play()
 }
 
 function drawShoots() {
@@ -336,6 +348,9 @@ function checkCollision2() {
 window.onload = function () {
   document.getElementById('start-button').onclick = function () {
     startGame()
+  }
+  document.getElementById('restart-button').onclick = function () {
+    reloadGame()
   }
 }
 
