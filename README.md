@@ -6,7 +6,7 @@ X-Wing es un juego multijugador del género survival donde podrás controlar la 
 
 ### Instrucciones
 
-![how-to-play](./images/markdom.png)
+![how-to-play](images/Markdom.png)
 
 1. Utiliza las teclas de movimiento designadas en la imagen superior para mover a tu nave.
 
