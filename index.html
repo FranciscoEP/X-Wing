@@ -4,21 +4,30 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="style.css" />
-    <title>X-Wing</title>
+    <title>X-Wing: Asalto a la Estrella de la Muerte</title>
   </head>
   <body>
     <div id="main-container">
       <div>
-        <h1>Survival Game</h1>
-        <p>Tear down as many Caza Ties as you can, <br>the last man standing will be the winner <br>
-        May the force be with you </p>
-        <img src="images/ARROW-KEYS.png" alt="Arrow-Keys" />   
+        <h1>X-Wing: Asalto a la Estrella de la Muerte</h1>
+        <p>Destruye los TIE Fighters y derrota a los jefes imperiales<br>
+        Controles: WASD (movimiento) + J (disparar)<br>
+        May the force be with you</p>
+        <img src="images/ARROW-KEYS.png" alt="Arrow-Keys" />
       </div>
       <div class="left-container">
       <canvas width="720" height="480"></canvas>
-      <div class ="button-container"><button id="start-button">Start</button>
-      <button id="restart-button">Restart</button></div>
+      <div class ="button-container">
+        <button id="start-button">Start</button>
+        <button id="restart-button">Restart</button>
+      </div>
     </div>
+
+    <!-- Orden de carga importante: Configuración -> Utils -> Managers -> Entidades -> Game -->
+    <script src="js/config/constants.js"></script>
+    <script src="js/utils/helpers.js"></script>
+    <script src="js/managers/GameManager.js"></script>
     <script src="main.js"></script>
+    <script src="js/game.js"></script>
   </body>
 </html>
