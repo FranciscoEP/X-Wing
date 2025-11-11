@@ -23,11 +23,31 @@
       </div>
     </div>
 
-    <!-- Orden de carga importante: Configuración -> Utils -> Managers -> Entidades -> Game -->
+    <!-- Orden de carga importante: Configuración -> Utils -> Entidades -> Managers -> Game -->
+    <!-- 1. Configuración y constantes -->
     <script src="js/config/constants.js"></script>
+
+    <!-- 2. Utilidades -->
     <script src="js/utils/helpers.js"></script>
+
+    <!-- 3. Entidades -->
+    <script src="js/entities/Background.js"></script>
+    <script src="js/entities/Player.js"></script>
+    <script src="js/entities/Bullet.js"></script>
+    <script src="js/entities/EnemyBullet.js"></script>
+    <script src="js/entities/Enemy.js"></script>
+    <script src="js/entities/PowerUp.js"></script>
+
+    <!-- 4. UI -->
+    <script src="js/ui/HUD.js"></script>
+
+    <!-- 5. Managers -->
     <script src="js/managers/GameManager.js"></script>
-    <script src="main.js"></script>
+
+    <!-- 6. Código legacy (será eliminado en fases posteriores) -->
+    <!-- <script src="main.js"></script> -->
+
+    <!-- 7. Game (Entry point) -->
     <script src="js/game.js"></script>
   </body>
 </html>
