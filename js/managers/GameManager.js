@@ -21,26 +21,28 @@ class GameManager {
 
     // Puntuación y vidas
     this.score = 0;
-    this.lives = 3;
 
     // Fase actual
     this.currentPhase = 0;
     this.enemiesKilled = 0;
+    this.enemiesSpawned = 0;
 
-    // Colecciones de entidades
-    this.entities = {
-      player: null,
-      enemies: [],
-      playerBullets: [],
-      enemyBullets: [],
-      powerUps: [],
-      bosses: []
-    };
+    // Entidades del juego
+    this.background = new Background();
+    this.player = new Player(200, GAME_CONFIG.CANVAS_HEIGHT / 2 - 50, ASSETS.images.player1);
+    this.enemies = [];
+    this.playerBullets = [];
+    this.enemyBullets = [];
+    this.powerUps = [];
+
+    // UI
+    this.hud = new HUD();
 
     // Audio
     this.audio = {
-      bgMusic: null,
-      sfx: {}
+      bgMusic: new Audio(ASSETS.sounds.mainTitle),
+      shootSound: new Audio(ASSETS.sounds.pewPew),
+      deathSound: new Audio(ASSETS.sounds.death)
     };
 
     // Input
@@ -116,13 +118,51 @@ class GameManager {
   }
 
   updatePlaying() {
-    // Esta función se implementará más adelante
-    // Actualiza el jugador, enemigos, balas, colisiones, etc.
+    // Actualizar fondo
+    this.background.update();
+
+    // Actualizar jugador
+    this.player.update(this.keys);
+
+    // Disparar si se presiona J
+    if (this.keys[GAME_CONFIG.KEYS.SHOOT]) {
+      const bullets = this.player.shoot();
+      if (bullets) {
+        this.playerBullets.push(...bullets);
+        Utils.playSound(this.audio.shootSound, 0.3);
+      }
+    }
+
+    // Actualizar balas del jugador
+    this.updatePlayerBullets();
+
+    // Generar enemigos
+    this.spawnEnemies();
+
+    // Actualizar enemigos
+    this.updateEnemies();
+
+    // Actualizar balas enemigas
+    this.updateEnemyBullets();
+
+    // Actualizar power-ups
+    this.updatePowerUps();
+
+    // Verificar colisiones
+    this.checkCollisions();
+
+    // Verificar condición de victoria de fase
+    this.checkPhaseComplete();
+
+    // Verificar si el jugador murió
+    if (this.player.isDead && !this.player.respawn()) {
+      this.setState(GAME_STATES.GAME_OVER);
+    }
   }
 
   updateBossFight() {
-    // Esta función se implementará más adelante
-    // Lógica específica para peleas de jefes
+    // Lógica específica para peleas de jefes (FASE 2+)
+    this.updatePlaying();
   }
 
   render() {
@@ -152,8 +192,27 @@ class GameManager {
   }
 
   renderGame() {
-    // Esta función se implementará más adelante
-    // Renderiza todos los elementos del juego
+    // Fondo
+    this.background.draw(this.ctx);
+
+    // Jugador
+    this.player.draw(this.ctx);
+
+    // Balas del jugador
+    this.playerBullets.forEach(bullet => bullet.draw(this.ctx));
+
+    // Enemigos
+    this.enemies.forEach(enemy => enemy.draw(this.ctx));
+
+    // Balas enemigas
+    this.enemyBullets.forEach(bullet => bullet.draw(this.ctx));
+
+    // Power-ups
+    this.powerUps.forEach(powerUp => powerUp.draw(this.ctx));
+
+    // HUD
+    const currentPhase = this.getCurrentPhase();
+    this.hud.draw(this.ctx, this.player, this.score, currentPhase);
   }
 
   renderMenu() {
@@ -244,16 +303,23 @@ class GameManager {
   reset() {
     this.frames = 0;
     this.score = 0;
-    this.lives = this.difficulty.playerLives;
     this.currentPhase = 0;
     this.enemiesKilled = 0;
+    this.enemiesSpawned = 0;
+
+    // Reiniciar jugador
+    this.player = new Player(200, GAME_CONFIG.CANVAS_HEIGHT / 2 - 50, ASSETS.images.player1);
+    this.player.lives = this.difficulty.playerLives;
+    this.player.speed = this.difficulty.playerSpeed;
 
     // Limpiar entidades
-    this.entities.enemies = [];
-    this.entities.playerBullets = [];
-    this.entities.enemyBullets = [];
-    this.entities.powerUps = [];
-    this.entities.bosses = [];
+    this.enemies = [];
+    this.playerBullets = [];
+    this.enemyBullets = [];
+    this.powerUps = [];
+
+    // Reiniciar background
+    this.background = new Background();
   }
 
   restart() {
@@ -340,5 +406,250 @@ class GameManager {
 
   getCurrentPhase() {
     return GAME_PHASES[this.currentPhase];
+  }
+
+  // ==========================================
+  // UPDATE AUXILIARES
+  // ==========================================
+
+  updatePlayerBullets() {
+    for (let i = this.playerBullets.length - 1; i >= 0; i--) {
+      this.playerBullets[i].update();
+
+      if (this.playerBullets[i].isOffScreen()) {
+        this.playerBullets.splice(i, 1);
+      }
+    }
+  }
+
+  updateEnemyBullets() {
+    for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
+      this.enemyBullets[i].update();
+
+      if (this.enemyBullets[i].isOffScreen()) {
+        this.enemyBullets.splice(i, 1);
+      }
+    }
+  }
+
+  updateEnemies() {
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const enemy = this.enemies[i];
+      enemy.update();
+
+      // Hacer que dispare periódicamente
+      if (this.frames % 90 === 0 && enemy.x < GAME_CONFIG.CANVAS_WIDTH - 100) {
+        const bullets = enemy.shoot();
+        if (bullets) {
+          this.enemyBullets.push(...bullets);
+        }
+      }
+
+      if (enemy.isOffScreen()) {
+        this.enemies.splice(i, 1);
+      }
+    }
+  }
+
+  updatePowerUps() {
+    for (let i = this.powerUps.length - 1; i >= 0; i--) {
+      this.powerUps[i].update();
+
+      if (this.powerUps[i].isOffScreen()) {
+        this.powerUps.splice(i, 1);
+      }
+    }
+  }
+
+  spawnEnemies() {
+    const phase = this.getCurrentPhase();
+    if (!phase || phase.type !== 'NORMAL_COMBAT') return;
+
+    // Verificar si ya spawneamos todos los enemigos de la fase
+    if (this.enemiesSpawned >= phase.enemyCount) return;
+
+    // Spawn según el rate de la fase
+    if (this.frames % phase.spawnRate === 0) {
+      const randomY = Utils.randomRange(50, GAME_CONFIG.CANVAS_HEIGHT - 150);
+      const enemy = new Enemy(GAME_CONFIG.CANVAS_WIDTH, randomY, phase.enemyType);
+
+      // Aplicar multiplicador de dificultad
+      enemy.speed *= this.difficulty.enemySpeedMultiplier;
+
+      this.enemies.push(enemy);
+      this.enemiesSpawned++;
+    }
+  }
+
+  checkCollisions() {
+    // Colisiones: Balas del jugador vs Enemigos
+    for (let i = this.playerBullets.length - 1; i >= 0; i--) {
+      const bullet = this.playerBullets[i];
+
+      for (let j = this.enemies.length - 1; j >= 0; j--) {
+        const enemy = this.enemies[j];
+
+        if (bullet.isColliding(enemy)) {
+          // Enemigo recibe daño
+          const died = enemy.takeDamage(bullet.damage);
+
+          if (died) {
+            this.enemiesKilled++;
+            this.addScore(enemy.scoreValue);
+
+            // Posibilidad de drop de power-up
+            const powerUp = PowerUp.spawnRandom(
+              enemy.x,
+              enemy.y,
+              this.difficulty.powerUpDropRate
+            );
+
+            if (powerUp) {
+              this.powerUps.push(powerUp);
+            }
+
+            this.enemies.splice(j, 1);
+          }
+
+          bullet.destroy();
+          this.playerBullets.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+    // Colisiones: Balas enemigas vs Jugador
+    for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
+      const bullet = this.enemyBullets[i];
+
+      if (bullet.isColliding(this.player)) {
+        this.player.takeDamage(bullet.damage);
+        bullet.destroy();
+        this.enemyBullets.splice(i, 1);
+
+        // Efecto visual
+        Utils.screenShake(this.canvas, 5, 100);
+      }
+    }
+
+    // Colisiones: Power-ups vs Jugador
+    for (let i = this.powerUps.length - 1; i >= 0; i--) {
+      const powerUp = this.powerUps[i];
+
+      if (powerUp.isColliding(this.player)) {
+        this.applyPowerUp(powerUp);
+        powerUp.collect();
+        this.powerUps.splice(i, 1);
+      }
+    }
+
+    // Colisiones: Jugador vs Enemigos (colisión directa)
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const enemy = this.enemies[i];
+
+      if (enemy.isColliding(this.player)) {
+        this.player.takeDamage(30); // Daño mayor por colisión directa
+        enemy.destroy();
+        this.enemies.splice(i, 1);
+
+        Utils.screenShake(this.canvas, 10, 200);
+      }
+    }
+  }
+
+  checkPhaseComplete() {
+    const phase = this.getCurrentPhase();
+    if (!phase) return;
+
+    if (phase.type === 'NORMAL_COMBAT') {
+      // Fase completa si eliminamos todos los enemigos
+      if (this.enemiesKilled >= phase.enemyCount) {
+        this.completePhase();
+      }
+    }
+  }
+
+  completePhase() {
+    console.log(`¡Fase ${this.currentPhase + 1} completada!`);
+
+    // Bonus por completar fase
+    this.addScore(SCORE_VALUES.PHASE_COMPLETE_BONUS);
+
+    // Bonus por no recibir daño
+    if (this.player.hp === this.player.maxHP) {
+      this.addScore(SCORE_VALUES.NO_DAMAGE_BONUS);
+    }
+
+    // Avanzar a la siguiente fase
+    this.nextPhase();
+
+    // Reset para la nueva fase
+    this.enemiesSpawned = 0;
+    this.enemiesKilled = 0;
+  }
+
+  applyPowerUp(powerUp) {
+    const config = powerUp.config;
+
+    console.log(`Power-up recogido: ${config.name}`);
+
+    switch(powerUp.type) {
+      // Ofensivos con duración
+      case 'DUAL_SHOT':
+      case 'QUAD_SHOT':
+      case 'LASER_BEAM':
+      case 'AUTO_AIM':
+        this.player.addPowerUp(powerUp.type, config.duration * 60 / 1000);
+        break;
+
+      // Defensivos con duración
+      case 'ENERGY_SHIELD':
+        this.player.isInvulnerable = true;
+        this.player.invulnerabilityTimer = config.duration * 60 / 1000;
+        break;
+
+      case 'SPEED_BOOST':
+        this.player.speed = GAME_CONFIG.PLAYER_SPEED * 1.5;
+        setTimeout(() => {
+          this.player.speed = GAME_CONFIG.PLAYER_SPEED;
+        }, config.duration);
+        break;
+
+      case 'PHASE_CLOAK':
+        this.player.isInvulnerable = true;
+        this.player.invulnerabilityTimer = config.duration * 60 / 1000;
+        break;
+
+      // Utilidad instantánea
+      case 'REPAIR_KIT':
+        this.player.heal(50);
+        break;
+
+      case 'SMART_BOMB':
+        // Eliminar todas las balas enemigas
+        this.enemyBullets = [];
+        // Dañar todos los enemigos
+        this.enemies.forEach(enemy => {
+          enemy.takeDamage(50);
+        });
+        Utils.screenFlash(this.ctx, this.canvas, 'rgba(255, 255, 0, 0.5)', 200);
+        break;
+
+      case 'SLOW_MOTION':
+        // TODO: Implementar slow motion en FASE 4
+        break;
+
+      case 'FORCE_POWER':
+        // Empujar todas las balas hacia atrás
+        this.enemyBullets.forEach(bullet => {
+          bullet.speed *= -1;
+        });
+        break;
+
+      default:
+        console.log(`Power-up no implementado: ${powerUp.type}`);
+    }
+
+    this.addScore(50); // Bonus por recoger power-up
   }
 }
