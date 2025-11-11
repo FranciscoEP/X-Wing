@@ -22,13 +22,14 @@ class GameManager {
     // Puntuación y vidas
     this.score = 0;
 
-    // Fase actual
-    this.currentPhase = 0;
-    this.enemiesKilled = 0;
-    this.enemiesSpawned = 0;
+    // Phase Manager
+    this.phaseManager = new PhaseManager(this);
 
     // Entidades del juego
     this.background = new Background();
+
+    // Reiniciar transiciones
+    this.transitionScreen = new TransitionScreen();
     this.player = new Player(200, GAME_CONFIG.CANVAS_HEIGHT / 2 - 50, ASSETS.images.player1);
     this.enemies = [];
     this.playerBullets = [];
@@ -37,6 +38,7 @@ class GameManager {
 
     // UI
     this.hud = new HUD();
+    this.transitionScreen = new TransitionScreen();
 
     // Audio
     this.audio = {
@@ -118,6 +120,17 @@ class GameManager {
   }
 
   updatePlaying() {
+    // Actualizar transiciones del phase manager
+    this.phaseManager.updateTransition();
+
+    // Si hay transición activa, no actualizar el juego
+    if (this.phaseManager.isTransitioning) {
+      return;
+    }
+
+    // Actualizar estadísticas de la fase
+    this.phaseManager.updatePhaseStats();
+
     // Actualizar fondo
     this.background.update();
 
@@ -211,8 +224,14 @@ class GameManager {
     this.powerUps.forEach(powerUp => powerUp.draw(this.ctx));
 
     // HUD
-    const currentPhase = this.getCurrentPhase();
+    const currentPhase = this.phaseManager.getCurrentPhase();
     this.hud.draw(this.ctx, this.player, this.score, currentPhase);
+
+    // Transiciones del phase manager
+    this.phaseManager.renderTransition(this.ctx);
+
+    // Transiciones de pantalla
+    this.transitionScreen.draw(this.ctx, this.canvas);
   }
 
   renderMenu() {
@@ -277,6 +296,7 @@ class GameManager {
 
   startPlaying() {
     this.reset();
+    this.phaseManager.startFirstPhase();
     this.start();
   }
 
@@ -303,9 +323,8 @@ class GameManager {
   reset() {
     this.frames = 0;
     this.score = 0;
-    this.currentPhase = 0;
-    this.enemiesKilled = 0;
-    this.enemiesSpawned = 0;
+    // Reiniciar phase manager
+    this.phaseManager = new PhaseManager(this);
 
     // Reiniciar jugador
     this.player = new Player(200, GAME_CONFIG.CANVAS_HEIGHT / 2 - 50, ASSETS.images.player1);
@@ -320,6 +339,9 @@ class GameManager {
 
     // Reiniciar background
     this.background = new Background();
+
+    // Reiniciar transiciones
+    this.transitionScreen = new TransitionScreen();
   }
 
   restart() {
@@ -398,14 +420,12 @@ class GameManager {
   }
 
   nextPhase() {
-    this.currentPhase++;
-    if (this.currentPhase >= GAME_PHASES.length) {
-      this.setState(GAME_STATES.VICTORY);
-    }
+    this.phaseManager.nextPhase();
+  }
   }
 
   getCurrentPhase() {
-    return GAME_PHASES[this.currentPhase];
+    return this.phaseManager.getCurrentPhase();
   }
 
   // ==========================================
@@ -462,11 +482,14 @@ class GameManager {
   }
 
   spawnEnemies() {
-    const phase = this.getCurrentPhase();
+    const phase = this.phaseManager.getCurrentPhase();
     if (!phase || phase.type !== 'NORMAL_COMBAT') return;
 
     // Verificar si ya spawneamos todos los enemigos de la fase
-    if (this.enemiesSpawned >= phase.enemyCount) return;
+    const stats = this.phaseManager.phaseStats;
+
+    // Verificar si ya spawneamos todos los enemigos de la fase
+    if (stats.enemiesSpawned >= phase.enemyCount) return;
 
     // Spawn según el rate de la fase
     if (this.frames % phase.spawnRate === 0) {
@@ -477,7 +500,7 @@ class GameManager {
       enemy.speed *= this.difficulty.enemySpeedMultiplier;
 
       this.enemies.push(enemy);
-      this.enemiesSpawned++;
+      stats.enemiesSpawned++;
     }
   }
 
@@ -494,7 +517,7 @@ class GameManager {
           const died = enemy.takeDamage(bullet.damage);
 
           if (died) {
-            this.enemiesKilled++;
+            this.phaseManager.recordEnemyKilled();
             this.addScore(enemy.scoreValue);
 
             // Posibilidad de drop de power-up
@@ -524,6 +547,7 @@ class GameManager {
 
       if (bullet.isColliding(this.player)) {
         this.player.takeDamage(bullet.damage);
+        this.phaseManager.recordDamage(bullet.damage);
         bullet.destroy();
         this.enemyBullets.splice(i, 1);
 
@@ -538,6 +562,7 @@ class GameManager {
 
       if (powerUp.isColliding(this.player)) {
         this.applyPowerUp(powerUp);
+        this.phaseManager.recordPowerUpCollected();
         powerUp.collect();
         this.powerUps.splice(i, 1);
       }
@@ -548,7 +573,8 @@ class GameManager {
       const enemy = this.enemies[i];
 
       if (enemy.isColliding(this.player)) {
-        this.player.takeDamage(30); // Daño mayor por colisión directa
+        this.player.takeDamage(30);
+        this.phaseManager.recordDamage(30); // Daño mayor por colisión directa
         enemy.destroy();
         this.enemies.splice(i, 1);
 
@@ -558,7 +584,7 @@ class GameManager {
   }
 
   checkPhaseComplete() {
-    const phase = this.getCurrentPhase();
+    const phase = this.phaseManager.getCurrentPhase();
     if (!phase) return;
 
     if (phase.type === 'NORMAL_COMBAT') {
