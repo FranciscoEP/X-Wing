@@ -116,6 +116,9 @@ class Bullet {
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
     ctx.drawImage(this.img, this.x, this.y + 90, this.width, this.height)
   }
+  isOffScreen() {
+    return this.x > canvas.width + 50
+  }
 }
 
 class Enemy {
@@ -159,6 +162,9 @@ class Pewpew {
     this.x -= 30
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
   }
+  isOffScreen() {
+    return this.x < -50
+  }
 }
 
 class Sounds {
@@ -187,8 +193,8 @@ class Hp1 {
     if (lifeP1 === 0) this.img.src = 'images/Full.png'
     if (lifeP1 === 3) this.img.src = 'images/34.png'
     if (lifeP1 === 6) this.img.src = 'images/medium.png'
-    if (lifeP1 === 9) this.img.src = 'images/almost-done.png'
-    if (lifeP1 === 10) this.img.src = 'images/donep.png'
+    if (lifeP1 === 9) this.img.src = 'images/Almost-done.png'
+    if (lifeP1 === 10) this.img.src = 'images/Done.png'
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height)
   }
 }
@@ -216,9 +222,9 @@ class Hp2 {
 const background = new Board()
 const player1 = new Player(200, 300, images.player1)
 const player2 = new Player(200, 100, images.player2)
-const pewPewSound = new Audio(sounds.pewPewSound, 0.1)
-const mainTitle = new Audio(sounds.mainTitle, 0.1)
-const finalSound = new Audio(sounds.death, 0.1)
+const pewPewSound = new Audio(sounds.pewPew)
+const mainTitle = new Audio(sounds.mainTitle)
+const finalSound = new Audio(sounds.death)
 const hp1 = new Hp1()
 const hp2 = new Hp2()
 // funciones principales
@@ -274,22 +280,40 @@ function gameOver() {
 
 function drawShoots() {
   shoots.forEach((shoot) => shoot.draw())
+  // Limpiar balas fuera de pantalla
+  for (let i = shoots.length - 1; i >= 0; i--) {
+    if (shoots[i].isOffScreen()) {
+      shoots.splice(i, 1)
+    }
+  }
 }
 
 function generateEnemies() {
   /*generar varios disparos*/
 
   if (frames % 30 === 0) {
-    const random = Math.floor(Math.random() * canvas.height - 100)
+    const random = Math.floor(Math.random() * (canvas.height - 100))
     const newEnemy = new Enemy(canvas.width, random)
     ties.push(newEnemy)
-    newEnemy.shoot()
     console.log('Enemigo ', ties.length)
   }
+
+  // Los enemigos disparan solo después de estar en pantalla un tiempo
+  ties.forEach((tie) => {
+    if (frames % 90 === 0 && tie.x < canvas.width - 100) {
+      tie.shoot()
+    }
+  })
 }
 
 function drawPewpew() {
   pewpews.forEach((pewpew) => pewpew.draw())
+  // Limpiar balas enemigas fuera de pantalla
+  for (let i = pewpews.length - 1; i >= 0; i--) {
+    if (pewpews[i].isOffScreen()) {
+      pewpews.splice(i, 1)
+    }
+  }
 }
 
 function drawEnemies() {
@@ -301,7 +325,7 @@ function checkCollisionP1() {
   pewpews.forEach((pewpew, indexPewpew) => {
     if (player1.istouching(pewpew)) {
       player1.hp -= 10
-      pewpews.splice(1, indexPewpew)
+      pewpews.splice(indexPewpew, 1)
       lifeP1++
       console.log('Te quedan ' + player1.hp)
     }
@@ -314,7 +338,7 @@ function checkCollisionP2() {
   pewpews.forEach((pewpew, indexPewpew) => {
     if (player2.istouching(pewpew)) {
       player2.hp -= 10
-      pewpews.splice(1, indexPewpew)
+      pewpews.splice(indexPewpew, 1)
       lifeP2++
       console.log('Te quedan ' + player2.hp)
     }
@@ -427,7 +451,6 @@ document.addEventListener('keydown', (e) => {
     case 76:
       player2.shoot()
       pewPewSound.play()
-
       break
   }
 })
