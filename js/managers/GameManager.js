@@ -112,7 +112,9 @@ class GameManager {
         this.updatePlaying();
         break;
       case GAME_STATES.BOSS_FIGHT:
-        this.updateBossFight();
+
+        this.initBossFight(this.phaseManager.getCurrentPhase());
+                this.updateBossFight();
         break;
     }
 
@@ -174,8 +176,24 @@ class GameManager {
   }
 
   updateBossFight() {
-    // Lógica específica para peleas de jefes (FASE 2+)
+    // Actualizar el jefe primero
+    if (this.currentBoss && this.currentBoss.active) {
+      this.currentBoss.update();
+
+      // Disparar periódicamente
+      if (this.frames % 60 === 0) {
+        const bullets = this.currentBoss.shoot();
+        if (bullets) {
+          this.enemyBullets.push(...bullets);
+        }
+      }
+    }
+
+    // Llamar a update normal
     this.updatePlaying();
+
+    // Verificar colisiones con jefe
+    this.checkBossCollisions();
   }
 
   render() {
@@ -189,7 +207,9 @@ class GameManager {
         break;
       case GAME_STATES.PLAYING:
       case GAME_STATES.BOSS_FIGHT:
-        this.renderGame();
+
+        this.initBossFight(this.phaseManager.getCurrentPhase());
+                this.renderGame();
         break;
       case GAME_STATES.PAUSED:
         this.renderGame();
@@ -677,5 +697,197 @@ class GameManager {
     }
 
     this.addScore(50); // Bonus por recoger power-up
+  }
+}
+
+  // ==========================================
+  // BOSS MANAGEMENT
+  // ==========================================
+
+  initBossFight(phase) {
+    console.log(`Iniciando pelea de jefe: ${phase.bossType}`);
+
+    // Crear CSS Sprite Manager si no existe
+    if (!this.cssSpriteManager) {
+      this.cssSpriteManager = new CSSSpriteManager(this.canvas);
+    }
+
+    // Limpiar jefes anteriores
+    if (this.currentBoss) {
+      this.currentBoss.destroy();
+    }
+
+    // Crear el jefe según el tipo
+    const bossX = GAME_CONFIG.CANVAS_WIDTH - 100;
+    const bossY = GAME_CONFIG.CANVAS_HEIGHT / 2;
+
+    switch(phase.bossType) {
+      case 'TIE_ADVANCED':
+        this.currentBoss = new TIEAdvanced(bossX, bossY - 75, this.cssSpriteManager);
+        break;
+
+      case 'STAR_DESTROYER':
+        this.currentBoss = new StarDestroyer(bossX - 150, bossY - 100, this.cssSpriteManager);
+        break;
+
+      case 'DEATH_STAR':
+        this.currentBoss = new DeathStar(bossX - 200, bossY - 200, this.cssSpriteManager);
+        break;
+
+      default:
+        console.error(`Tipo de jefe desconocido: ${phase.bossType}`);
+        return;
+    }
+
+    // Aplicar multiplicador de dificultad
+    this.currentBoss.hp *= this.difficulty.bossHPMultiplier;
+    this.currentBoss.maxHP *= this.difficulty.bossHPMultiplier;
+
+    console.log(`Jefe creado: ${this.currentBoss.name} (${this.currentBoss.hp} HP)`);
+  }
+
+  updateBossFight() {
+    // Actualizar el jefe
+    if (this.currentBoss && this.currentBoss.active) {
+      this.currentBoss.update();
+
+      // Disparar periódicamente
+      if (this.frames % 60 === 0) {
+        const bullets = this.currentBoss.shoot();
+        if (bullets) {
+          this.enemyBullets.push(...bullets);
+        }
+      }
+
+      // Star Destroyer puede spawnear TIE Fighters
+      if (this.currentBoss.type === 'STAR_DESTROYER' && this.currentBoss.shouldSpawnTIE()) {
+        const randomY = Utils.randomRange(50, GAME_CONFIG.CANVAS_HEIGHT - 150);
+        const tie = new Enemy(GAME_CONFIG.CANVAS_WIDTH, randomY, 'TIE_FIGHTER');
+        tie.speed *= this.difficulty.enemySpeedMultiplier;
+        this.enemies.push(tie);
+      }
+
+      // Death Star superlaser
+      if (this.currentBoss.type === 'DEATH_STAR' && this.currentBoss.isSuperLaserFiring()) {
+        this.handleDeathStarSuperlaser();
+      }
+    }
+
+    // Llamar a update normal para jugador, balas, etc
+    this.updatePlaying();
+
+    // Verificar colisiones con jefe
+    this.checkBossCollisions();
+  }
+
+  checkBossCollisions() {
+    if (!this.currentBoss || !this.currentBoss.active) return;
+
+    // Balas del jugador vs Jefe
+    for (let i = this.playerBullets.length - 1; i >= 0; i--) {
+      const bullet = this.playerBullets[i];
+
+      // Death Star tiene weak point
+      if (this.currentBoss.type === 'DEATH_STAR') {
+        const isWeakPoint = this.currentBoss.checkWeakPointHit(bullet);
+
+        if (isWeakPoint) {
+          const died = this.currentBoss.takeDamage(bullet.damage, true);
+
+          if (died) {
+            this.onBossDefeated();
+          }
+
+          bullet.destroy();
+          this.playerBullets.splice(i, 1);
+          Utils.screenShake(this.canvas, 15, 300);
+          continue;
+        }
+      }
+
+      // Colisión normal
+      if (bullet.isColliding(this.currentBoss)) {
+        const died = this.currentBoss.takeDamage(bullet.damage);
+
+        if (died) {
+          this.onBossDefeated();
+        }
+
+        bullet.destroy();
+        this.playerBullets.splice(i, 1);
+        Utils.screenShake(this.canvas, 8, 150);
+      }
+    }
+
+    // Jugador vs Jefe (colisión directa)
+    if (this.currentBoss.isColliding(this.player)) {
+      this.player.takeDamage(50); // Daño masivo
+      this.phaseManager.recordDamage(50);
+      Utils.screenShake(this.canvas, 20, 500);
+    }
+  }
+
+  onBossDefeated() {
+    console.log(`¡Jefe derrotado! ${this.currentBoss.name}`);
+
+    // Puntuación según el jefe
+    const scoreValue = {
+      'TIE_ADVANCED': SCORE_VALUES.TIE_ADVANCED,
+      'STAR_DESTROYER': SCORE_VALUES.STAR_DESTROYER,
+      'DEATH_STAR': SCORE_VALUES.DEATH_STAR
+    }[this.currentBoss.type] || 5000;
+
+    this.addScore(scoreValue);
+
+    // Limpiar enemigos y balas
+    this.enemies = [];
+    this.enemyBullets = [];
+
+    // Completar fase
+    this.phaseManager.completePhase();
+  }
+
+  handleDeathStarSuperlaser() {
+    // Efecto visual de superlaser
+    // Si el jugador está en la línea del láser, recibe daño masivo
+
+    const laserY = this.currentBoss.y + 200; // Centro de la Death Star
+    const laserHeight = 50;
+
+    if (this.player.y < laserY + laserHeight &&
+        this.player.y + this.player.height > laserY) {
+
+      // Jugador está en la línea del láser
+      this.player.takeDamage(30);
+      this.phaseManager.recordDamage(30);
+      Utils.screenFlash(this.ctx, this.canvas, 'rgba(0, 255, 0, 0.5)', 100);
+      Utils.screenShake(this.canvas, 20, 500);
+    }
+
+    // Dibujar el rayo en canvas
+    this.drawSuperlaser(laserY, laserHeight);
+  }
+
+  drawSuperlaser(y, height) {
+    const ctx = this.ctx;
+
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+
+    // Rayo verde brillante
+    const gradient = ctx.createLinearGradient(0, y, 0, y + height);
+    gradient.addColorStop(0, 'rgba(0, 255, 0, 0)');
+    gradient.addColorStop(0.5, 'rgba(0, 255, 0, 1)');
+    gradient.addColorStop(1, 'rgba(0, 255, 0, 0)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, y, this.currentBoss.x, height);
+
+    // Glow effect
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = '#0f0';
+    ctx.fillRect(0, y, this.currentBoss.x, height);
+
+    ctx.restore();
   }
 }
