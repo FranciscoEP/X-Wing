@@ -22,13 +22,14 @@ class GameManager {
     // Puntuación y vidas
     this.score = 0;
 
-    // Fase actual
-    this.currentPhase = 0;
-    this.enemiesKilled = 0;
-    this.enemiesSpawned = 0;
+    // Phase Manager
+    this.phaseManager = new PhaseManager(this);
 
     // Entidades del juego
     this.background = new Background();
+
+    // Reiniciar transiciones
+    this.transitionScreen = new TransitionScreen();
     this.player = new Player(200, GAME_CONFIG.CANVAS_HEIGHT / 2 - 50, ASSETS.images.player1);
     this.enemies = [];
     this.playerBullets = [];
@@ -37,6 +38,7 @@ class GameManager {
 
     // UI
     this.hud = new HUD();
+    this.transitionScreen = new TransitionScreen();
 
     // Audio
     this.audio = {
@@ -102,6 +104,11 @@ class GameManager {
   update() {
     if (this.isPaused) return;
 
+    // Update particles and effects
+    if (this.particleEmitter) this.particleEmitter.update();
+    if (this.visualEffects) this.visualEffects.update();
+    if (this.mainMenu && this.mainMenu.active) this.mainMenu.update();
+
     this.frames++;
 
     // Update según el estado
@@ -110,7 +117,9 @@ class GameManager {
         this.updatePlaying();
         break;
       case GAME_STATES.BOSS_FIGHT:
-        this.updateBossFight();
+
+        this.initBossFight(this.phaseManager.getCurrentPhase());
+                this.updateBossFight();
         break;
     }
 
@@ -118,6 +127,17 @@ class GameManager {
   }
 
   updatePlaying() {
+    // Actualizar transiciones del phase manager
+    this.phaseManager.updateTransition();
+
+    // Si hay transición activa, no actualizar el juego
+    if (this.phaseManager.isTransitioning) {
+      return;
+    }
+
+    // Actualizar estadísticas de la fase
+    this.phaseManager.updatePhaseStats();
+
     // Actualizar fondo
     this.background.update();
 
@@ -161,8 +181,24 @@ class GameManager {
   }
 
   updateBossFight() {
-    // Lógica específica para peleas de jefes (FASE 2+)
+    // Actualizar el jefe primero
+    if (this.currentBoss && this.currentBoss.active) {
+      this.currentBoss.update();
+
+      // Disparar periódicamente
+      if (this.frames % 60 === 0) {
+        const bullets = this.currentBoss.shoot();
+        if (bullets) {
+          this.enemyBullets.push(...bullets);
+        }
+      }
+    }
+
+    // Llamar a update normal
     this.updatePlaying();
+
+    // Verificar colisiones con jefe
+    this.checkBossCollisions();
   }
 
   render() {
@@ -176,7 +212,9 @@ class GameManager {
         break;
       case GAME_STATES.PLAYING:
       case GAME_STATES.BOSS_FIGHT:
-        this.renderGame();
+
+        this.initBossFight(this.phaseManager.getCurrentPhase());
+                this.renderGame();
         break;
       case GAME_STATES.PAUSED:
         this.renderGame();
@@ -192,6 +230,13 @@ class GameManager {
   }
 
   renderGame() {
+    // Particle background (starfield)
+    if (this.particleEmitter) {
+      this.ctx.save();
+      this.particleEmitter.particles.filter(p => p.life === Infinity).forEach(p => p.draw(this.ctx));
+      this.ctx.restore();
+    }
+
     // Fondo
     this.background.draw(this.ctx);
 
@@ -210,9 +255,27 @@ class GameManager {
     // Power-ups
     this.powerUps.forEach(powerUp => powerUp.draw(this.ctx));
 
+    // Particles (foreground)
+    if (this.particleEmitter) {
+      this.ctx.save();
+      this.particleEmitter.particles.filter(p => p.life !== Infinity).forEach(p => p.draw(this.ctx));
+      this.ctx.restore();
+    }
+
+    // Visual effects
+    if (this.visualEffects) {
+      this.visualEffects.render();
+    }
+
     // HUD
-    const currentPhase = this.getCurrentPhase();
+    const currentPhase = this.phaseManager.getCurrentPhase();
     this.hud.draw(this.ctx, this.player, this.score, currentPhase);
+
+    // Transiciones del phase manager
+    this.phaseManager.renderTransition(this.ctx);
+
+    // Transiciones de pantalla
+    this.transitionScreen.draw(this.ctx, this.canvas);
   }
 
   renderMenu() {
@@ -277,6 +340,7 @@ class GameManager {
 
   startPlaying() {
     this.reset();
+    this.phaseManager.startFirstPhase();
     this.start();
   }
 
@@ -303,9 +367,8 @@ class GameManager {
   reset() {
     this.frames = 0;
     this.score = 0;
-    this.currentPhase = 0;
-    this.enemiesKilled = 0;
-    this.enemiesSpawned = 0;
+    // Reiniciar phase manager
+    this.phaseManager = new PhaseManager(this);
 
     // Reiniciar jugador
     this.player = new Player(200, GAME_CONFIG.CANVAS_HEIGHT / 2 - 50, ASSETS.images.player1);
@@ -320,6 +383,9 @@ class GameManager {
 
     // Reiniciar background
     this.background = new Background();
+
+    // Reiniciar transiciones
+    this.transitionScreen = new TransitionScreen();
   }
 
   restart() {
@@ -398,14 +464,12 @@ class GameManager {
   }
 
   nextPhase() {
-    this.currentPhase++;
-    if (this.currentPhase >= GAME_PHASES.length) {
-      this.setState(GAME_STATES.VICTORY);
-    }
+    this.phaseManager.nextPhase();
+  }
   }
 
   getCurrentPhase() {
-    return GAME_PHASES[this.currentPhase];
+    return this.phaseManager.getCurrentPhase();
   }
 
   // ==========================================
@@ -462,11 +526,14 @@ class GameManager {
   }
 
   spawnEnemies() {
-    const phase = this.getCurrentPhase();
+    const phase = this.phaseManager.getCurrentPhase();
     if (!phase || phase.type !== 'NORMAL_COMBAT') return;
 
     // Verificar si ya spawneamos todos los enemigos de la fase
-    if (this.enemiesSpawned >= phase.enemyCount) return;
+    const stats = this.phaseManager.phaseStats;
+
+    // Verificar si ya spawneamos todos los enemigos de la fase
+    if (stats.enemiesSpawned >= phase.enemyCount) return;
 
     // Spawn según el rate de la fase
     if (this.frames % phase.spawnRate === 0) {
@@ -477,7 +544,7 @@ class GameManager {
       enemy.speed *= this.difficulty.enemySpeedMultiplier;
 
       this.enemies.push(enemy);
-      this.enemiesSpawned++;
+      stats.enemiesSpawned++;
     }
   }
 
@@ -494,7 +561,7 @@ class GameManager {
           const died = enemy.takeDamage(bullet.damage);
 
           if (died) {
-            this.enemiesKilled++;
+            this.phaseManager.recordEnemyKilled();
             this.addScore(enemy.scoreValue);
 
             // Posibilidad de drop de power-up
@@ -508,10 +575,17 @@ class GameManager {
               this.powerUps.push(powerUp);
             }
 
+            // Explosion effect
+            if (this.particleEmitter) {
+              this.particleEmitter.explosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2);
+            }
             this.enemies.splice(j, 1);
           }
 
-          bullet.destroy();
+          if (this.particleEmitter) {
+              this.particleEmitter.impact(bullet.x, bullet.y, "#ffff00");
+            }
+            bullet.destroy();
           this.playerBullets.splice(i, 1);
           break;
         }
@@ -523,8 +597,16 @@ class GameManager {
       const bullet = this.enemyBullets[i];
 
       if (bullet.isColliding(this.player)) {
-        this.player.takeDamage(bullet.damage);
-        bullet.destroy();
+        if (this.visualEffects) {
+        this.visualEffects.screenShake(5, 100);
+        this.visualEffects.drawDamageNumber(this.player.x + this.player.width/2, this.player.y, bullet.damage);
+      }
+      this.player.takeDamage(bullet.damage);
+        this.phaseManager.recordDamage(bullet.damage);
+        if (this.particleEmitter) {
+              this.particleEmitter.impact(bullet.x, bullet.y, "#ffff00");
+            }
+            bullet.destroy();
         this.enemyBullets.splice(i, 1);
 
         // Efecto visual
@@ -538,6 +620,7 @@ class GameManager {
 
       if (powerUp.isColliding(this.player)) {
         this.applyPowerUp(powerUp);
+        this.phaseManager.recordPowerUpCollected();
         powerUp.collect();
         this.powerUps.splice(i, 1);
       }
@@ -548,7 +631,8 @@ class GameManager {
       const enemy = this.enemies[i];
 
       if (enemy.isColliding(this.player)) {
-        this.player.takeDamage(30); // Daño mayor por colisión directa
+        this.player.takeDamage(30);
+        this.phaseManager.recordDamage(30); // Daño mayor por colisión directa
         enemy.destroy();
         this.enemies.splice(i, 1);
 
@@ -558,7 +642,7 @@ class GameManager {
   }
 
   checkPhaseComplete() {
-    const phase = this.getCurrentPhase();
+    const phase = this.phaseManager.getCurrentPhase();
     if (!phase) return;
 
     if (phase.type === 'NORMAL_COMBAT') {
@@ -653,3 +737,231 @@ class GameManager {
     this.addScore(50); // Bonus por recoger power-up
   }
 }
+
+  // ==========================================
+  // BOSS MANAGEMENT
+  // ==========================================
+
+  initBossFight(phase) {
+    console.log(`Iniciando pelea de jefe: ${phase.bossType}`);
+
+    // Crear CSS Sprite Manager si no existe
+    if (!this.cssSpriteManager) {
+      this.cssSpriteManager = new CSSSpriteManager(this.canvas);
+    }
+
+    // Limpiar jefes anteriores
+    if (this.currentBoss) {
+      this.currentBoss.destroy();
+    }
+
+    // Crear el jefe según el tipo
+    const bossX = GAME_CONFIG.CANVAS_WIDTH - 100;
+    const bossY = GAME_CONFIG.CANVAS_HEIGHT / 2;
+
+    switch(phase.bossType) {
+      case 'TIE_ADVANCED':
+        this.currentBoss = new TIEAdvanced(bossX, bossY - 75, this.cssSpriteManager);
+        break;
+
+      case 'STAR_DESTROYER':
+        this.currentBoss = new StarDestroyer(bossX - 150, bossY - 100, this.cssSpriteManager);
+        break;
+
+      case 'DEATH_STAR':
+        this.currentBoss = new DeathStar(bossX - 200, bossY - 200, this.cssSpriteManager);
+        break;
+
+      default:
+        console.error(`Tipo de jefe desconocido: ${phase.bossType}`);
+        return;
+    }
+
+    // Aplicar multiplicador de dificultad
+    this.currentBoss.hp *= this.difficulty.bossHPMultiplier;
+    this.currentBoss.maxHP *= this.difficulty.bossHPMultiplier;
+
+    console.log(`Jefe creado: ${this.currentBoss.name} (${this.currentBoss.hp} HP)`);
+  }
+
+  updateBossFight() {
+    // Actualizar el jefe
+    if (this.currentBoss && this.currentBoss.active) {
+      this.currentBoss.update();
+
+      // Disparar periódicamente
+      if (this.frames % 60 === 0) {
+        const bullets = this.currentBoss.shoot();
+        if (bullets) {
+          this.enemyBullets.push(...bullets);
+        }
+      }
+
+      // Star Destroyer puede spawnear TIE Fighters
+      if (this.currentBoss.type === 'STAR_DESTROYER' && this.currentBoss.shouldSpawnTIE()) {
+        const randomY = Utils.randomRange(50, GAME_CONFIG.CANVAS_HEIGHT - 150);
+        const tie = new Enemy(GAME_CONFIG.CANVAS_WIDTH, randomY, 'TIE_FIGHTER');
+        tie.speed *= this.difficulty.enemySpeedMultiplier;
+        this.enemies.push(tie);
+      }
+
+      // Death Star superlaser
+      if (this.currentBoss.type === 'DEATH_STAR' && this.currentBoss.isSuperLaserFiring()) {
+        this.handleDeathStarSuperlaser();
+      }
+    }
+
+    // Llamar a update normal para jugador, balas, etc
+    this.updatePlaying();
+
+    // Verificar colisiones con jefe
+    this.checkBossCollisions();
+  }
+
+  checkBossCollisions() {
+    if (!this.currentBoss || !this.currentBoss.active) return;
+
+    // Balas del jugador vs Jefe
+    for (let i = this.playerBullets.length - 1; i >= 0; i--) {
+      const bullet = this.playerBullets[i];
+
+      // Death Star tiene weak point
+      if (this.currentBoss.type === 'DEATH_STAR') {
+        const isWeakPoint = this.currentBoss.checkWeakPointHit(bullet);
+
+        if (isWeakPoint) {
+          const died = this.currentBoss.takeDamage(bullet.damage, true);
+
+          if (died) {
+            this.onBossDefeated();
+          }
+
+          if (this.particleEmitter) {
+              this.particleEmitter.impact(bullet.x, bullet.y, "#ffff00");
+            }
+            bullet.destroy();
+          this.playerBullets.splice(i, 1);
+          Utils.screenShake(this.canvas, 15, 300);
+          continue;
+        }
+      }
+
+      // Colisión normal
+      if (bullet.isColliding(this.currentBoss)) {
+        const died = this.currentBoss.takeDamage(bullet.damage);
+
+        if (died) {
+          this.onBossDefeated();
+        }
+
+        if (this.particleEmitter) {
+              this.particleEmitter.impact(bullet.x, bullet.y, "#ffff00");
+            }
+            bullet.destroy();
+        this.playerBullets.splice(i, 1);
+        Utils.screenShake(this.canvas, 8, 150);
+      }
+    }
+
+    // Jugador vs Jefe (colisión directa)
+    if (this.currentBoss.isColliding(this.player)) {
+      this.player.takeDamage(50); // Daño masivo
+      this.phaseManager.recordDamage(50);
+      Utils.screenShake(this.canvas, 20, 500);
+    }
+  }
+
+  onBossDefeated() {
+    console.log(`¡Jefe derrotado! ${this.currentBoss.name}`);
+
+    // Puntuación según el jefe
+    const scoreValue = {
+      'TIE_ADVANCED': SCORE_VALUES.TIE_ADVANCED,
+      'STAR_DESTROYER': SCORE_VALUES.STAR_DESTROYER,
+      'DEATH_STAR': SCORE_VALUES.DEATH_STAR
+    }[this.currentBoss.type] || 5000;
+
+    this.addScore(scoreValue);
+
+    // Limpiar enemigos y balas
+    this.enemies = [];
+    this.enemyBullets = [];
+
+    // Completar fase
+    this.phaseManager.completePhase();
+  }
+
+  handleDeathStarSuperlaser() {
+    // Efecto visual de superlaser
+    // Si el jugador está en la línea del láser, recibe daño masivo
+
+    const laserY = this.currentBoss.y + 200; // Centro de la Death Star
+    const laserHeight = 50;
+
+    if (this.player.y < laserY + laserHeight &&
+        this.player.y + this.player.height > laserY) {
+
+      // Jugador está en la línea del láser
+      this.player.takeDamage(30);
+      this.phaseManager.recordDamage(30);
+      Utils.screenFlash(this.ctx, this.canvas, 'rgba(0, 255, 0, 0.5)', 100);
+      Utils.screenShake(this.canvas, 20, 500);
+    }
+
+    // Dibujar el rayo en canvas
+    this.drawSuperlaser(laserY, laserHeight);
+  }
+
+  drawSuperlaser(y, height) {
+    const ctx = this.ctx;
+
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+
+    // Rayo verde brillante
+    const gradient = ctx.createLinearGradient(0, y, 0, y + height);
+    gradient.addColorStop(0, 'rgba(0, 255, 0, 0)');
+    gradient.addColorStop(0.5, 'rgba(0, 255, 0, 1)');
+    gradient.addColorStop(1, 'rgba(0, 255, 0, 0)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, y, this.currentBoss.x, height);
+
+    // Glow effect
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = '#0f0';
+    ctx.fillRect(0, y, this.currentBoss.x, height);
+
+    ctx.restore();
+  }
+}
+
+  // ==========================================
+  // INITIALIZATION IMPROVEMENTS
+  // ==========================================
+
+  initSystems() {
+    // Particle system
+    this.particleEmitter = new ParticleEmitter();
+
+    // Visual effects
+    this.visualEffects = new VisualEffects(this.canvas, this.ctx);
+
+    // UI Systems
+    this.pauseScreen = new PauseScreen();
+    this.mainMenu = new MainMenu();
+    this.mainMenu.show();
+
+    // Starfield background
+    this.particleEmitter.starfield(this.canvas, 150);
+  }
+}
+
+// Llamar initSystems cuando se crea el GameManager
+GameManager.prototype.originalConstructor = GameManager.prototype.constructor;
+GameManager.prototype.constructor = function(canvas, ctx) {
+  this.originalConstructor(canvas, ctx);
+  if (this.initSystems) {
+    this.initSystems();
+  }
+};
