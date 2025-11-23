@@ -104,6 +104,11 @@ class GameManager {
   update() {
     if (this.isPaused) return;
 
+    // Update particles and effects
+    if (this.particleEmitter) this.particleEmitter.update();
+    if (this.visualEffects) this.visualEffects.update();
+    if (this.mainMenu && this.mainMenu.active) this.mainMenu.update();
+
     this.frames++;
 
     // Update según el estado
@@ -225,6 +230,13 @@ class GameManager {
   }
 
   renderGame() {
+    // Particle background (starfield)
+    if (this.particleEmitter) {
+      this.ctx.save();
+      this.particleEmitter.particles.filter(p => p.life === Infinity).forEach(p => p.draw(this.ctx));
+      this.ctx.restore();
+    }
+
     // Fondo
     this.background.draw(this.ctx);
 
@@ -242,6 +254,18 @@ class GameManager {
 
     // Power-ups
     this.powerUps.forEach(powerUp => powerUp.draw(this.ctx));
+
+    // Particles (foreground)
+    if (this.particleEmitter) {
+      this.ctx.save();
+      this.particleEmitter.particles.filter(p => p.life !== Infinity).forEach(p => p.draw(this.ctx));
+      this.ctx.restore();
+    }
+
+    // Visual effects
+    if (this.visualEffects) {
+      this.visualEffects.render();
+    }
 
     // HUD
     const currentPhase = this.phaseManager.getCurrentPhase();
@@ -551,10 +575,17 @@ class GameManager {
               this.powerUps.push(powerUp);
             }
 
+            // Explosion effect
+            if (this.particleEmitter) {
+              this.particleEmitter.explosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2);
+            }
             this.enemies.splice(j, 1);
           }
 
-          bullet.destroy();
+          if (this.particleEmitter) {
+              this.particleEmitter.impact(bullet.x, bullet.y, "#ffff00");
+            }
+            bullet.destroy();
           this.playerBullets.splice(i, 1);
           break;
         }
@@ -566,9 +597,16 @@ class GameManager {
       const bullet = this.enemyBullets[i];
 
       if (bullet.isColliding(this.player)) {
-        this.player.takeDamage(bullet.damage);
+        if (this.visualEffects) {
+        this.visualEffects.screenShake(5, 100);
+        this.visualEffects.drawDamageNumber(this.player.x + this.player.width/2, this.player.y, bullet.damage);
+      }
+      this.player.takeDamage(bullet.damage);
         this.phaseManager.recordDamage(bullet.damage);
-        bullet.destroy();
+        if (this.particleEmitter) {
+              this.particleEmitter.impact(bullet.x, bullet.y, "#ffff00");
+            }
+            bullet.destroy();
         this.enemyBullets.splice(i, 1);
 
         // Efecto visual
@@ -798,7 +836,10 @@ class GameManager {
             this.onBossDefeated();
           }
 
-          bullet.destroy();
+          if (this.particleEmitter) {
+              this.particleEmitter.impact(bullet.x, bullet.y, "#ffff00");
+            }
+            bullet.destroy();
           this.playerBullets.splice(i, 1);
           Utils.screenShake(this.canvas, 15, 300);
           continue;
@@ -813,7 +854,10 @@ class GameManager {
           this.onBossDefeated();
         }
 
-        bullet.destroy();
+        if (this.particleEmitter) {
+              this.particleEmitter.impact(bullet.x, bullet.y, "#ffff00");
+            }
+            bullet.destroy();
         this.playerBullets.splice(i, 1);
         Utils.screenShake(this.canvas, 8, 150);
       }
@@ -891,3 +935,33 @@ class GameManager {
     ctx.restore();
   }
 }
+
+  // ==========================================
+  // INITIALIZATION IMPROVEMENTS
+  // ==========================================
+
+  initSystems() {
+    // Particle system
+    this.particleEmitter = new ParticleEmitter();
+
+    // Visual effects
+    this.visualEffects = new VisualEffects(this.canvas, this.ctx);
+
+    // UI Systems
+    this.pauseScreen = new PauseScreen();
+    this.mainMenu = new MainMenu();
+    this.mainMenu.show();
+
+    // Starfield background
+    this.particleEmitter.starfield(this.canvas, 150);
+  }
+}
+
+// Llamar initSystems cuando se crea el GameManager
+GameManager.prototype.originalConstructor = GameManager.prototype.constructor;
+GameManager.prototype.constructor = function(canvas, ctx) {
+  this.originalConstructor(canvas, ctx);
+  if (this.initSystems) {
+    this.initSystems();
+  }
+};
