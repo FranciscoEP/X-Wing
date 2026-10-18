@@ -3,7 +3,7 @@ import { SpriteCache } from './art/SpriteCache.js';
 import { Background } from './Background.js';
 import { drawBoss, drawBossOverlay } from './bosses.js';
 import { Effects } from './Effects.js';
-import { drawBullet, drawEnemy, drawHitbox, drawPlayer, drawPowerUp, drawTorpedo } from './entities.js';
+import { drawBullet, drawEnemy, drawHitbox, drawMine, drawPlayer, drawPowerUp, drawTorpedo } from './entities.js';
 import { bindVisualFeedback } from './feedback.js';
 import { Particles } from './Particles.js';
 
@@ -56,7 +56,8 @@ export class Renderer {
     const assets = { sprites, time };
     if (world.boss) drawBoss(ctx, world.boss, assets);
     for (const p of world.powerUps) drawPowerUp(ctx, p);
-    for (const e of world.enemies) drawEnemy(ctx, e, sprites);
+    for (const m of world.mines) drawMine(ctx, m, time);
+    for (const e of world.enemies) drawEnemy(ctx, e, sprites, time);
     for (const b of world.playerBullets) drawBullet(ctx, b);
     for (const t of world.torpedoes) drawTorpedo(ctx, t, time);
     drawPlayer(ctx, world.player, sprites, time);

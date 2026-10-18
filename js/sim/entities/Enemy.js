@@ -3,19 +3,19 @@ import { rand } from '../../core/utils.js';
 import { interceptAngle } from '../ai/aim.js';
 import { Evasion } from '../ai/evasion.js';
 import { cruise, SPAWN_X } from '../ai/movement.js';
+import { createWeapon } from '../ai/weapons.js';
 import { Bullet } from './Bullet.js';
 import { Entity } from './Entity.js';
 
 const SPAWN = { MIN_Y: 40, BOTTOM_MARGIN: 100 };
-const FIRE = { FIRST_MIN: 0.6, FIRST_MAX: 1.6, JITTER: 0.3, MIN_DISTANCE_TO_PLAYER: 60, RIGHT_MARGIN: 40 };
+const FIRE = { MIN_DISTANCE_TO_PLAYER: 60, RIGHT_MARGIN: 40 };
 const HIT_FLASH = 0.08;
 const ESCAPE_MARGIN = 60;
 
 /**
  * Caza imperial. Su vuelo lo decide `movement` (sim/ai/movement.js), al que se suma la esquiva
- * (`evasion`); al disparar anticipa el movimiento del jugador según la dificultad.
- * Si pertenece a un escuadrón (`squadron`, ver sim/ai/squadron.js), es este quien decide
- * cuándo dispara; si no, dispara por su cuenta.
+ * (`evasion`); cómo y cuándo ataca, su arma (`weapon`, sim/ai/weapons.js): cada tipo tiene la
+ * suya, con su aviso y su ritmo.
  */
 export class Enemy extends Entity {
   constructor(type, difficulty, { x = SPAWN_X, y = rand(SPAWN.MIN_Y, CANVAS.HEIGHT - SPAWN.BOTTOM_MARGIN), movement = null, fromWave = false } = {}) {
@@ -33,7 +33,7 @@ export class Enemy extends Entity {
     this.movement = movement ?? cruise({ baseY: y, wobble: cfg.wobble });
     this.evasion = new Evasion(cfg.dodge, difficulty.dodge);
     this.pathY = y;
-    this.fireTimer = rand(FIRE.FIRST_MIN, FIRE.FIRST_MAX);
+    this.weapon = createWeapon(cfg.weapon);
     this.hitFlash = 0;
     this.entered = false;
     this.escaped = false;
@@ -48,7 +48,7 @@ export class Enemy extends Entity {
     this.y = this.pathY + this.evasion.offset;
 
     if (!this.isOffScreen(0)) this.entered = true;
-    this.tryFire(dt, world);
+    this.weapon.update(this, dt, world);
 
     // Pasar el borde izquierdo siempre cuenta como escape, haya llegado a entrar o no:
     // si no, una nave que nunca aparece bloquearía el fin de la oleada.
@@ -57,14 +57,6 @@ export class Enemy extends Entity {
       this.dead = true;
       this.escaped = true;
     }
-  }
-
-  tryFire(dt, world) {
-    if (this.squadron) return;
-    this.fireTimer -= dt;
-    if (this.fireTimer > 0 || !this.canFire(world)) return;
-    this.fireTimer = 1 / this.fireRate + rand(-FIRE.JITTER, FIRE.JITTER);
-    this.fireAt(world);
   }
 
   /** En pantalla, por delante del jugador y con el jugador vivo. */

@@ -9,6 +9,7 @@ import { HIT } from './bosses/Boss.js';
 export function resolveCollisions(world) {
   torpedoes(world);
   playerBulletsVsEnemies(world);
+  playerBulletsVsMines(world);
   playerBulletsVsBoss(world);
   if (world.player.dead) return;
   enemyBulletsVsPlayer(world);
@@ -17,14 +18,15 @@ export function resolveCollisions(world) {
   powerUpsVsPlayer(world);
 }
 
-/** Un torpedo detona al tocar un enemigo o un jefe, o al agotar su vuelo. */
+/** Un torpedo detona al tocar un enemigo, una mina o un jefe, o al agotar su vuelo. */
 function torpedoes(world) {
   const { boss } = world;
   for (const torpedo of world.torpedoes) {
     if (torpedo.dead) continue;
     const bossHit = boss?.vulnerable ? boss.hitTest(torpedo) : null;
     const touchesEnemy = world.enemies.some((e) => !e.dead && overlaps(torpedo, e));
-    if (bossHit || touchesEnemy || torpedo.expired) {
+    const touchesMine = world.mines.some((m) => !m.dead && overlaps(torpedo, m));
+    if (bossHit || touchesEnemy || touchesMine || torpedo.expired) {
       world.detonateTorpedo(torpedo, { directBossHit: bossHit === HIT.DAMAGE });
     }
   }
@@ -39,6 +41,16 @@ function playerBulletsVsEnemies(world) {
     world.recordHit();
     world.emit('enemyHit', { x: bullet.cx, y: bullet.cy });
     world.hitEnemy(enemy, bullet.damage);
+  }
+}
+
+function playerBulletsVsMines(world) {
+  for (const bullet of world.playerBullets) {
+    if (bullet.dead) continue;
+    const mine = world.mines.find((m) => !m.dead && overlaps(bullet, m));
+    if (!mine) continue;
+    bullet.dead = true;
+    if (mine.takeDamage(bullet.damage)) world.destroyMine(mine);
   }
 }
 

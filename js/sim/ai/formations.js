@@ -1,7 +1,7 @@
 import { CANVAS, ENEMY_TYPES, FORMATION } from '../../config.js';
 import { random } from '../../core/random.js';
 import { clamp, rand } from '../../core/utils.js';
-import { cruise, dive, pincer, SPAWN_X, strafe } from './movement.js';
+import { cruise, dive, pincer, slash, SPAWN_X, strafe } from './movement.js';
 import { Squadron } from './squadron.js';
 
 const BAND = { TOP: 60, BOTTOM: 150 }; // franja vertical donde nace el líder
@@ -11,6 +11,7 @@ const PINCER = { X_RATIO: 0.72, DX: 60, SPREAD: 50 };
 const DIVE = { DX: 110, DY: 90, MIN_X_RATIO: 0.45, MAX_X_RATIO: 0.65 };
 const ECHELON = { DX: 70, DY: 60, DRIFT: 45, WOBBLE_FACTOR: 0.3 };
 const STRAFE = { DX: 90, LANE: 80, MIN_X_RATIO: 0.6, MAX_X_RATIO: 0.82, MIN_HOLD: 3, MAX_HOLD: 5 };
+const SLASH = { MIN_X_RATIO: 0.55, MAX_X_RATIO: 0.9, WARN: 0.7, STAGGER: 0.6 };
 
 /**
  * Cada formación devuelve la lista de { x, y, movement } de sus miembros.
@@ -88,6 +89,16 @@ const LAYOUTS = {
         }),
       };
     }),
+
+  // Pasadas en diagonal escalonadas en el tiempo, alternando arriba y abajo
+  [FORMATION.SLASH]: (size) => {
+    const fromTop = random() < 0.5;
+    return Array.from({ length: size }, (_, i) => {
+      const top = i % 2 === 0 ? fromTop : !fromTop;
+      const startX = CANVAS.WIDTH * rand(SLASH.MIN_X_RATIO, SLASH.MAX_X_RATIO);
+      return { x: startX, y: top ? -60 : CANVAS.HEIGHT, movement: slash({ startX, fromTop: top, warn: SLASH.WARN + i * SLASH.STAGGER }) };
+    });
+  },
 };
 
 /** Genera un escuadrón en el mundo y devuelve sus enemigos (que comparten un `Squadron`). */
@@ -96,7 +107,8 @@ export function spawnSquadron(world, enemyType, { formation, size }, { fromWave 
   if (!layout) throw new Error(`Formación desconocida: ${formation}`);
   const cfg = ENEMY_TYPES[enemyType];
   const members = layout(size, cfg, world).map(({ x, y, movement }) =>
-    world.spawnEnemy(enemyType, { x, y: movement.name === 'pincer' ? y : clamp(y, 20, CANVAS.HEIGHT - cfg.size - 20), movement, fromWave })
+    // Las que entran desde fuera (tenaza, pasada) conservan su altura inicial
+    world.spawnEnemy(enemyType, { x, y: ['pincer', 'slash'].includes(movement.name) ? y : clamp(y, 20, CANVAS.HEIGHT - cfg.size - 20), movement, fromWave })
   );
   world.addSquadron(new Squadron(members));
   return members;

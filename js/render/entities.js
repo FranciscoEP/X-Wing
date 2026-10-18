@@ -1,4 +1,4 @@
-import { POWERUP_ITEM } from '../config.js';
+import { MINE, POWERUP_ITEM, RENDER, WEAPONS } from '../config.js';
 import { rand } from '../core/utils.js';
 import { PAL } from './art/palette.js';
 import { XWING_ENGINES } from './art/pixelArt.js';
@@ -53,8 +53,52 @@ export function drawHitbox(ctx, box) {
   rect(ctx, px(box.x), px(box.y), Math.max(1, px(box.width)), Math.max(1, px(box.height)), PAL.white);
 }
 
-export function drawEnemy(ctx, enemy, sprites) {
-  drawSprite(ctx, sprites.enemies[enemy.type], px(enemy.cx), px(enemy.cy), { flash: enemy.hitFlash > 0 });
+export function drawEnemy(ctx, enemy, sprites, time) {
+  const warning = enemy.movement.warning;
+  if (warning) return drawPassWarning(ctx, warning, time);
+  const cx = px(enemy.cx);
+  const cy = px(enemy.cy);
+  const sprite = sprites.enemies[enemy.type];
+  drawSprite(ctx, sprite, cx, cy, { flash: enemy.hitFlash > 0 });
+  // Aviso del TIE Fighter: sus cañones brillan antes del disparo doble
+  if (enemy.weapon.charge > 0 && Math.floor(time * 20) % 2 === 0) {
+    const gap = px(WEAPONS.TWIN.gap);
+    const x = cx - Math.floor(sprite.w / 2) - 1;
+    for (const dy of [-gap, gap]) {
+      rect(ctx, x - 1, cy + dy - 1, 3, 3, PAL.yellow);
+      rect(ctx, x, cy + dy, 1, 1, PAL.white);
+    }
+  }
+}
+
+/** Aviso de pasada del Interceptor: línea roja discontinua por la diagonal que va a cruzar. */
+function drawPassWarning(ctx, w, time) {
+  // Parpadea cada vez más rápido según se acerca la pasada
+  const rate = 6 + w.progress * 14;
+  if (Math.floor(time * rate) % 2) return;
+  const x0 = px(w.x);
+  const y0 = px(w.y);
+  const len = RENDER.WIDTH + RENDER.HEIGHT;
+  for (let i = 0; i < len; i += 6) {
+    rect(ctx, x0 + w.dx * i, y0 + w.dy * i, 3, 1, PAL.red);
+  }
+  // Flecha en el borde de la pantalla por donde entrará
+  const ex = Math.max(2, Math.min(RENDER.WIDTH - 6, x0 + w.dx * (w.dy > 0 ? -y0 / w.dy : (RENDER.HEIGHT - y0) / -w.dy)));
+  const ey = w.dy > 0 ? 2 : RENDER.HEIGHT - 6;
+  rect(ctx, ex, ey, 4, 4, PAL.redHi);
+}
+
+/** Mina: esfera con púas; su luz parpadea cada vez más rápido hasta estallar. */
+export function drawMine(ctx, mine, time) {
+  const cx = px(mine.cx);
+  const cy = px(mine.cy);
+  const r = Math.round(px(MINE.size) / 2);
+  for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) rect(ctx, cx + dx * (r + 1), cy + dy * (r + 1), 1, 1, PAL.mid);
+  circle(ctx, cx, cy, r, PAL.outline);
+  circle(ctx, cx, cy, r - 1, PAL.dark);
+  const period = Math.max(0.06, mine.timeLeft / 6);
+  const on = Math.floor(time / period) % 2 === 0;
+  rect(ctx, cx - 1, cy - 1, 2, 2, on ? (mine.fuse !== null ? PAL.white : PAL.red) : PAL.ink);
 }
 
 export function drawPowerUp(ctx, p) {

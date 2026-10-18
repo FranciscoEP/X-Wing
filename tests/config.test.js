@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { BOSS_TYPES, DIFFICULTIES, ENEMY_TYPES, PHASE_TYPE, PHASES, POWERUPS } from '../js/config.js';
+import { BOSS_TYPES, DIFFICULTIES, ENEMY_TYPES, PHASE_TYPE, PHASES, POWERUPS, WEAPONS } from '../js/config.js';
+import { WEAPON_KINDS } from '../js/sim/ai/weapons.js';
+import { ENEMY_ART } from '../js/render/art/pixelArt.js';
 import { BOSS_RENDERERS } from '../js/render/bosses.js';
 import { BOSS_CLASSES } from '../js/sim/bosses/registry.js';
 import { POWERUP_EFFECTS } from '../js/sim/powerups.js';
@@ -18,10 +20,18 @@ describe('integridad de config.js', () => {
         for (const sq of phase.squadrons) {
           assert.ok(FORMATIONS.includes(sq.formation), `formación ${sq.formation}`);
           assert.ok(sq.size > 0);
+          if (sq.enemy) assert.ok(ENEMY_TYPES[sq.enemy], `enemigo del escuadrón ${sq.enemy}`);
         }
       } else {
         assert.ok(BOSS_TYPES[phase.boss], `jefe ${phase.boss}`);
       }
+    }
+  });
+
+  it('cada enemigo tiene arma (con parámetros) y sprite', () => {
+    for (const [type, cfg] of Object.entries(ENEMY_TYPES)) {
+      assert.ok(WEAPON_KINDS[cfg.weapon] && WEAPONS[cfg.weapon], `arma de ${type}`);
+      assert.ok(ENEMY_ART[type], `sprite de ${type}`);
     }
   });
 

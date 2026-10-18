@@ -19,24 +19,6 @@ function arena({ phase = 0 } = {}) {
   return world;
 }
 
-/** Escuadrón de naves quietas en pantalla, para aislar el disparo. */
-function stillSquadron(world, n, type = 'TIE_FIGHTER') {
-  const members = Array.from({ length: n }, (_, i) => {
-    const y = 80 + i * 90;
-    const e = world.spawnEnemy(type, { x: 700, y, movement: cruise({ baseY: y, wobble: 0 }), fromWave: false });
-    e.speed = 0;
-    return e;
-  });
-  const squadron = new Squadron(members);
-  world.addSquadron(squadron);
-  return squadron;
-}
-
-/** Avanza solo el escuadrón (sin mover balas ni jugador): cuenta exacta de disparos. */
-function fireFor(world, squadron, seconds) {
-  for (let t = 0; t < seconds; t += DT) squadron.update(DT, world);
-}
-
 describe('IA: escalón', () => {
   it('forma una diagonal y se desliza hacia la altura del jugador', () => {
     const world = arena();
@@ -154,64 +136,6 @@ describe('IA: líder del escuadrón', () => {
     squad.forEach((e) => world.hitEnemy(e, 999));
     run(world, DT, godMode);
     assert.equal(world.squadrons.length, 0);
-  });
-});
-
-describe('IA: disparo coordinado', () => {
-  it('las naves de un escuadrón no disparan por su cuenta', () => {
-    const world = arena();
-    const squadron = stillSquadron(world, 3);
-    squadron.volleyTimer = Infinity;
-    run(world, 5, godMode);
-    assert.equal(world.enemyBullets.length, 0);
-  });
-
-  it('ráfaga: una nave dispara tres láseres que anticipan cada vez más', () => {
-    const world = arena();
-    const squadron = stillSquadron(world, 1);
-    world.player.vy = 300; // el jugador baja
-    squadron.volleyTimer = 0;
-    fireFor(world, squadron, 0.3);
-    const vys = world.enemyBullets.map((b) => b.vy);
-    assert.equal(vys.length, 3);
-    assert.ok(vys[0] < vys[1] && vys[1] < vys[2], `anticipación no creciente: ${vys.map((v) => v.toFixed(0))}`);
-  });
-
-  it('las ráfagas se reparten por turnos entre las naves', () => {
-    const world = arena();
-    const squadron = stillSquadron(world, 2);
-    const shooters = new Set();
-    const origin = new Map(squadron.members.map((m) => [m.cy, m]));
-    fireFor(world, squadron, 12);
-    for (const b of world.enemyBullets) shooters.add(origin.get(b.cy));
-    assert.equal(shooters.size, 2, 'disparó siempre la misma nave');
-  });
-
-  it('andanada: con tres o más naves en posición a veces disparan todas a la vez', () => {
-    const world = arena();
-    const squadron = stillSquadron(world, 4);
-    let salvoSize = 0;
-    world.events.on('squadronSalvo', ({ count }) => (salvoSize = count));
-    fireFor(world, squadron, 30);
-    assert.equal(salvoSize, 4);
-  });
-
-  it('mantiene la cadencia media: tantos láseres como si cada nave disparara sola', () => {
-    const world = arena();
-    const squadron = stillSquadron(world, 3);
-    const seconds = 120;
-    fireFor(world, squadron, seconds);
-    const expected = squadron.members.reduce((s, m) => s + m.fireRate, 0) * seconds;
-    const ratio = world.enemyBullets.length / expected;
-    assert.ok(ratio > 0.8 && ratio < 1.2, `ratio ${ratio.toFixed(2)}`);
-  });
-
-  it('las naves sueltas (fuera de escuadrón) siguen disparando por su cuenta', () => {
-    const world = arena();
-    const e = world.spawnEnemy('TIE_FIGHTER', { x: 700, y: 200, movement: cruise({ baseY: 200, wobble: 0 }) });
-    e.speed = 0;
-    run(world, 5, godMode);
-    assert.ok(world.enemyBullets.length > 0);
   });
 });
 

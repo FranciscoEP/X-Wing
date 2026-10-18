@@ -100,7 +100,8 @@ export class PhaseManager {
     this.lastSquadron = spec;
     const size = Math.min(spec.size, p.count - this.spawned);
     this.spawned += size;
-    return { formation: spec.formation, size };
+    // `enemy` (opcional) cambia el tipo de nave de este escuadrón respecto al de la fase
+    return { formation: spec.formation, size, enemy: spec.enemy };
   }
 
   recordDamage(amount) {

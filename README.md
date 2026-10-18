@@ -14,12 +14,15 @@ Shooter espacial en Canvas + JavaScript (ES modules, sin dependencias ni build).
 | Pausa | `P` o `Esc` (`Q` en pausa vuelve al menú) |
 | Silenciar | `M` o el botón «Sonido» bajo el juego |
 
-## Inteligencia artificial enemiga
+## Enemigos: cada uno con su firma
 
-- **Puntería predictiva:** TIEs y jefes disparan a donde *vas a estar* (intercepción). La dificultad gradúa cuánto anticipan (`aimLead`).
-- **Formaciones:** las oleadas llegan en escuadrones — V, columna serpenteante, tenaza (entran por arriba y abajo y te encierran) y picada (se lanzan hacia tu posición).
-- **Esquiva:** los interceptores (y Vader) detectan tus láseres y se apartan; después necesitan recuperarse, así que una segunda ráfaga sí los alcanza.
-- **Fases de Vader:** persecución → embestida anunciada con una franja roja (¡muévete!) → escudo deflector intermitente y escoltas. El escudo se apaga durante la embestida: es tu ventana.
+| Enemigo | Cómo ataca | Aviso | Cómo esquivarlo |
+| --- | --- | --- | --- |
+| TIE Fighter | Par de láseres rectos, solo cuando te tiene enfrente | Sus cañones brillan 0,3 s | Sal de su línea |
+| TIE Interceptor | Cruza la pantalla en diagonal y suelta un abanico de 3 al pasar a tu altura | Línea roja por la diagonal antes de entrar | Apártate de la diagonal |
+| TIE Bomber | Suelta minas que estallan en un radio | La mina parpadea cada vez más rápido | Destrúyela de un disparo o rodéala |
+
+Cada nave dispara a su propio ritmo (`sim/ai/weapons.js`). Las formaciones (V, columna, tenaza, escalón, hostigamiento, pasada) y la ruptura al caer el líder siguen en `sim/ai/`. Darth Vader tiene tres etapas: persecución, embestida anunciada con una franja roja y escudo con escoltas.
 
 Power-ups que sueltan los enemigos: disparo triple, fuego rápido, escudo, reparación y torpedos extra. En la Estrella de la Muerte solo el **puerto de escape** (círculo amarillo) recibe daño; esquiva el superláser cuando veas la línea verde punteada.
 

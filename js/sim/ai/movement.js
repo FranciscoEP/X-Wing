@@ -118,4 +118,48 @@ export function dive({ baseY, diveX, diveSpeedFactor = 2.4 }) {
   };
 }
 
+/**
+ * Pasada en diagonal (Interceptor): durante `warn` segundos espera fuera de la pantalla mientras
+ * el renderer marca su trayectoria; luego la cruza a gran velocidad y sale por el lado opuesto.
+ * La trayectoria pasa por donde estaba el jugador al empezar el aviso: hay que apartarse.
+ */
+export function slash({ startX, fromTop, warn = 0.7, speedFactor = 2.2 }) {
+  let state = 'warn';
+  let timer = warn;
+  let dir = null;
+  let y = 0;
+  return {
+    name: 'slash',
+    get state() {
+      return state;
+    },
+    /** Datos del aviso para el renderer: punto de entrada, dirección y progreso 0..1. */
+    get warning() {
+      return state === 'warn' && dir ? { ...dir, progress: 1 - timer / warn } : null;
+    },
+    update(enemy, dt, world) {
+      if (!dir) {
+        y = fromTop ? -enemy.height - 4 : CANVAS.HEIGHT + 4; // del todo fuera hasta que pase
+        enemy.x = startX;
+        const dx = world.player.cx - (startX + enemy.width / 2);
+        const dy = world.player.cy - (y + enemy.height / 2);
+        const len = Math.hypot(dx, dy) || 1;
+        dir = { x: startX + enemy.width / 2, y: y + enemy.height / 2, dx: dx / len, dy: dy / len };
+      }
+      if (state === 'warn') {
+        timer -= dt;
+        if (timer <= 0) {
+          state = 'pass';
+          world.emit('enemyPass', { enemy });
+        }
+        return y;
+      }
+      const speed = enemy.speed * speedFactor;
+      enemy.x += dir.dx * speed * dt;
+      y += dir.dy * speed * dt;
+      return y;
+    },
+  };
+}
+
 export const SPAWN_X = CANVAS.WIDTH + 10;

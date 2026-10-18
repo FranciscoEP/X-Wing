@@ -115,4 +115,27 @@ export const TIE_ADVANCED = {
   },
 };
 
-export const ENEMY_ART = { TIE_FIGHTER, TIE_INTERCEPTOR };
+/** TIE Bomber: dos cápsulas (cabina y bodega de minas) entre alas dobladas. */
+export const TIE_BOMBER = {
+  w: 32,
+  h: 24,
+  paint(p) {
+    p.mirrorX(16, () => {
+      p.r(0, 2, 3, 20, PAL.panel);
+      p.r(1, 0, 2, 2, PAL.panel);
+      p.r(1, 22, 2, 2, PAL.panel);
+      p.r(0, 2, 1, 20, PAL.imperialDk);
+      for (const y of [7, 12, 17]) p.r(0, y, 3, 1, PAL.imperialDk);
+      p.r(3, 10, 4, 3, PAL.imperialDk);
+    });
+    p.r(14, 10, 4, 3, PAL.imperialDk);
+    // Bodega de minas (derecha) y cabina (izquierda)
+    p.c(20, 12, 4, PAL.imperialDk);
+    p.r(18, 14, 5, 1, PAL.mid);
+    p.c(12, 11, 4, PAL.imperial);
+    p.c(12, 11, 2, PAL.ink);
+    p.r(11, 11, 3, 1, PAL.window);
+  },
+};
+
+export const ENEMY_ART = { TIE_FIGHTER, TIE_INTERCEPTOR, TIE_BOMBER };

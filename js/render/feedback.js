@@ -38,6 +38,12 @@ export function bindVisualFeedback(events, { particles, effects }) {
   });
   events.on('squadronBroken', ({ x, y, divers }) => divers && particles.text(x, y - 20, '¡ROMPEN FILAS!', PAL.orange));
   events.on('enemyDodge', ({ enemy }) => particles.sparks(enemy.x + enemy.width, enemy.cy, PAL.glass, 2));
+  events.on('mineBlast', ({ x, y, radius }) => {
+    particles.explosion(x, y, { size: 12, count: 16 });
+    particles.shockwave(x, y, radius, PAL.orange, 0.3);
+    effects.shake(6, 0.25);
+  });
+  events.on('mineDestroyed', ({ x, y }) => particles.explosion(x, y, { size: 4, count: 6 }));
   events.on('vaderMode', ({ mode }) => mode === 'charge' && effects.shake(8, 0.4));
   events.on('superlaser', () => {
     effects.shake(14, 0.6);

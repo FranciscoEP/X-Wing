@@ -1,4 +1,4 @@
-import { COMBAT, PHASE_TYPE, POWERUPS, SCORE, TORPEDO } from '../config.js';
+import { COMBAT, MINE, PHASE_TYPE, POWERUPS, SCORE, TORPEDO } from '../config.js';
 import { EventBus } from '../core/EventBus.js';
 import { random } from '../core/random.js';
 import { centerOf, distance, prune, weightedPick } from '../core/utils.js';
@@ -20,7 +20,7 @@ export const OUTCOME = { VICTORY: 'victory', DEFEAT: 'defeat' };
  * Eventos: shot, enemyHit, enemyDestroyed, enemyEscaped, bossHit, armorHit, bossDying,
  * bossDestroyed, explosion, shieldBlock, playerHit, playerDestroyed, playerRespawn,
  * powerUpCollected, torpedoLaunched, torpedoBlast, superlaser, enemyDodge, enemyDive, squadronBroken,
- * squadronSalvo, bossStage, scored, phaseStart, phaseClear, gameOver.
+ * mineDropped, mineArmed, mineBlast, mineDestroyed, enemyCharge, enemyTwinShot, enemyPass, bossStage, scored, phaseStart, phaseClear, gameOver.
  */
 export class World {
   constructor({ difficulty, events = new EventBus() }) {
@@ -29,6 +29,7 @@ export class World {
     this.player = new Player(difficulty.lives);
     this.enemies = [];
     this.squadrons = [];
+    this.mines = [];
     this.playerBullets = [];
     this.torpedoes = [];
     this.enemyBullets = [];
@@ -68,7 +69,7 @@ export class World {
     if (controls.torpedo) this.launchTorpedo();
 
     const squadron = this.phases.nextSquadron(dt);
-    if (squadron) spawnSquadron(this, this.phases.phase.enemy, squadron);
+    if (squadron) spawnSquadron(this, squadron.enemy ?? this.phases.phase.enemy, squadron);
 
     for (const e of this.enemies) e.update(dt, this);
     for (const s of this.squadrons) s.update(dt, this);
@@ -76,6 +77,7 @@ export class World {
     for (const t of this.torpedoes) t.update(dt);
     for (const b of this.enemyBullets) b.update(dt);
     for (const p of this.powerUps) p.update(dt);
+    for (const m of this.mines) m.update(dt, this);
     this.boss?.update(dt, this);
 
     resolveCollisions(this);
@@ -93,6 +95,26 @@ export class World {
     const enemy = new Enemy(type, this.difficulty, opts);
     this.enemies.push(enemy);
     return enemy;
+  }
+
+  spawnMine(mine) {
+    this.mines.push(mine);
+    this.emit('mineDropped', { mine });
+  }
+
+  /** La mina estalla: daña al jugador si está dentro del radio. */
+  detonateMine(mine) {
+    if (mine.dead) return;
+    mine.dead = true;
+    this.emit('mineBlast', { x: mine.cx, y: mine.cy, radius: MINE.radius });
+    const { player } = this;
+    if (Math.hypot(player.cx - mine.cx, player.cy - mine.cy) < MINE.radius) this.damagePlayer(MINE.damage);
+  }
+
+  /** Un láser o torpedo destruye la mina antes de que estalle (sin daño). */
+  destroyMine(mine) {
+    this.emit('mineDestroyed', { x: mine.cx, y: mine.cy });
+    this.addScore(MINE.score, { x: mine.cx, y: mine.cy });
   }
 
   addSquadron(squadron) {
@@ -142,6 +164,12 @@ export class World {
       }
     }
     this.emit('torpedoBlast', { ...center, radius: TORPEDO.BLAST_RADIUS, cleared });
+    for (const m of this.mines) {
+      if (!m.dead && distance(center, centerOf(m)) <= TORPEDO.BLAST_RADIUS) {
+        m.dead = true;
+        this.destroyMine(m);
+      }
+    }
     for (const e of this.enemies) {
       if (!e.dead && distance(center, centerOf(e)) <= TORPEDO.BLAST_RADIUS) this.hitEnemy(e, TORPEDO.ENEMY_DAMAGE);
     }
@@ -221,6 +249,7 @@ export class World {
     prune(this.torpedoes, (t) => !t.dead);
     prune(this.enemyBullets, (b) => !b.dead);
     prune(this.powerUps, (p) => !p.dead);
+    prune(this.mines, (m) => !m.dead);
 
     if (this.boss?.dead) {
       this.boss = null;
