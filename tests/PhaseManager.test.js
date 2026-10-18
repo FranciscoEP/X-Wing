@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { PHASE_BANNER_TIME, PHASES } from '../js/config.js';
+import { FORMATION, PHASE_BANNER_TIME, PHASE_TYPE, PHASES } from '../js/config.js';
 import { PHASE_STATUS, PhaseManager } from '../js/sim/PhaseManager.js';
+import { resetRandomSource, useSeed } from './helpers.js';
 
 const make = () => {
   const calls = [];
@@ -23,7 +24,7 @@ describe('PhaseManager', () => {
     assert.deepEqual(calls, [['start', PHASES[0].name]]);
   });
 
-  it('genera escuadrones en ciclo hasta `count` enemigos exactos y se supera al resolverlos', () => {
+  it('genera escuadrones al azar hasta `count` enemigos exactos y se supera al resolverlos', () => {
     const { pm, calls } = make();
     pm.start();
     pm.update(PHASE_BANNER_TIME + 0.01);
@@ -34,11 +35,72 @@ describe('PhaseManager', () => {
     }
     const total = squadrons.reduce((n, sq) => n + sq.size, 0);
     assert.equal(total, PHASES[0].count);
-    assert.equal(squadrons[0].formation, PHASES[0].squadrons[0].formation, 'empieza por el primero');
-    assert.equal(squadrons[PHASES[0].squadrons.length].formation, PHASES[0].squadrons[0].formation, 'vuelve a empezar el ciclo');
+    const known = new Set(PHASES[0].squadrons.map((s) => s.formation));
+    assert.ok(squadrons.every((sq) => known.has(sq.formation)));
     for (let i = 0; i < PHASES[0].count; i++) pm.recordWaveEnemyGone({ killed: i % 2 === 0 });
     assert.equal(pm.status, PHASE_STATUS.CLEAR);
     assert.deepEqual(calls.at(-1), ['clear', PHASES[0].name, true]);
+  });
+
+  /** Fase de oleada larga con dos escuadrones distinguibles por tamaño. */
+  const longWave = (squadrons) => [{ type: PHASE_TYPE.WAVE, name: 'Prueba', count: 2000, squadronEvery: 1, squadrons }];
+  const drain = (pm, dt = 0.05) => {
+    const out = [];
+    const gaps = [];
+    let since = 0;
+    for (let i = 0; i < 100000 && pm.spawned < pm.phase.count; i++) {
+      since += dt;
+      const sq = pm.nextSquadron(dt);
+      if (!sq) continue;
+      out.push(sq);
+      gaps.push(since);
+      since = 0;
+    }
+    return { out, gaps: gaps.slice(1) };
+  };
+
+  it('nunca repite el mismo escuadrón dos veces seguidas y respeta los pesos', () => {
+    useSeed(7);
+    const pm = new PhaseManager({}, longWave([
+      { formation: FORMATION.V, size: 1, weight: 3 },
+      { formation: FORMATION.COLUMN, size: 1, weight: 1 },
+      { formation: FORMATION.PINCER, size: 1, weight: 1 },
+    ]));
+    pm.start();
+    pm.update(PHASE_BANNER_TIME + 0.01);
+    const { out } = drain(pm);
+    resetRandomSource();
+    assert.ok(out.every((sq, i) => i === 0 || sq.formation !== out[i - 1].formation), 'repitió escuadrón');
+    const share = out.filter((sq) => sq.formation === FORMATION.V).length / out.length;
+    // Sin repetir, V (peso 3) sale como mucho la mitad de las veces, pero más que las otras
+    assert.ok(share > 0.4 && share <= 0.5, `V salió ${(share * 100).toFixed(0)}%`);
+  });
+
+  it('el intervalo entre escuadrones varía alrededor de `squadronEvery`', () => {
+    useSeed(3);
+    const pm = new PhaseManager({}, longWave([{ formation: FORMATION.V, size: 1 }, { formation: FORMATION.COLUMN, size: 1 }]));
+    pm.start();
+    pm.update(PHASE_BANNER_TIME + 0.01);
+    const { gaps } = drain(pm, 0.01);
+    resetRandomSource();
+    const min = Math.min(...gaps);
+    const max = Math.max(...gaps);
+    assert.ok(min >= 0.74 && max <= 1.27, `intervalos entre ${min} y ${max}`);
+    assert.ok(max - min > 0.3, 'el intervalo no varía');
+  });
+
+  it('dos partidas con distinta semilla no reciben la misma secuencia de escuadrones', () => {
+    const sequence = (seed) => {
+      useSeed(seed);
+      const pm = new PhaseManager();
+      pm.start();
+      pm.update(PHASE_BANNER_TIME + 0.01);
+      const seq = drain(pm).out.map((sq) => sq.formation).join(' ');
+      resetRandomSource();
+      return seq;
+    };
+    const seqs = new Set([1, 2, 3, 4, 5].map(sequence));
+    assert.ok(seqs.size >= 4, `solo ${seqs.size} secuencias distintas en 5 partidas`);
   });
 
   it('marca la fase como no perfecta si hubo daño', () => {

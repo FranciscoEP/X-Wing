@@ -19,7 +19,8 @@ export const OUTCOME = { VICTORY: 'victory', DEFEAT: 'defeat' };
  *
  * Eventos: shot, enemyHit, enemyDestroyed, enemyEscaped, bossHit, armorHit, bossDying,
  * bossDestroyed, explosion, shieldBlock, playerHit, playerDestroyed, playerRespawn,
- * powerUpCollected, torpedoLaunched, torpedoBlast, superlaser, enemyDodge, enemyDive, bossStage, scored, phaseStart, phaseClear, gameOver.
+ * powerUpCollected, torpedoLaunched, torpedoBlast, superlaser, enemyDodge, enemyDive, squadronBroken,
+ * squadronSalvo, bossStage, scored, phaseStart, phaseClear, gameOver.
  */
 export class World {
   constructor({ difficulty, events = new EventBus() }) {
@@ -27,6 +28,7 @@ export class World {
     this.events = events;
     this.player = new Player(difficulty.lives);
     this.enemies = [];
+    this.squadrons = [];
     this.playerBullets = [];
     this.torpedoes = [];
     this.enemyBullets = [];
@@ -69,6 +71,7 @@ export class World {
     if (squadron) spawnSquadron(this, this.phases.phase.enemy, squadron);
 
     for (const e of this.enemies) e.update(dt, this);
+    for (const s of this.squadrons) s.update(dt, this);
     for (const b of this.playerBullets) b.update(dt);
     for (const t of this.torpedoes) t.update(dt);
     for (const b of this.enemyBullets) b.update(dt);
@@ -90,6 +93,10 @@ export class World {
     const enemy = new Enemy(type, this.difficulty, opts);
     this.enemies.push(enemy);
     return enemy;
+  }
+
+  addSquadron(squadron) {
+    this.squadrons.push(squadron);
   }
 
   damagePlayer(amount, { silent = false } = {}) {
@@ -209,6 +216,7 @@ export class World {
       if (e.fromWave) this.phases.recordWaveEnemyGone({ killed: !e.escaped });
     }
     prune(this.enemies, (e) => !e.dead);
+    prune(this.squadrons, (s) => !s.done);
     prune(this.playerBullets, (b) => !b.dead);
     prune(this.torpedoes, (t) => !t.dead);
     prune(this.enemyBullets, (b) => !b.dead);

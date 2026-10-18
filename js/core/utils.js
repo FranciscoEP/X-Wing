@@ -30,6 +30,17 @@ export function weightedPick(table) {
   return entries[entries.length - 1][0];
 }
 
+/** Elige un elemento de `list` con probabilidad proporcional a su `weight` (1 si no tiene). */
+export function weightedChoice(list) {
+  const total = list.reduce((sum, item) => sum + (item.weight ?? 1), 0);
+  let roll = random() * total;
+  for (const item of list) {
+    roll -= item.weight ?? 1;
+    if (roll < 0) return item;
+  }
+  return list[list.length - 1];
+}
+
 /** Elimina en sitio los elementos que no cumplen el predicado (sin crear arrays nuevos). */
 export function prune(list, keep) {
   let w = 0;

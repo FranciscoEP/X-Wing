@@ -95,7 +95,7 @@ export const ENEMY_TYPES = {
 };
 
 /** Formaciones de escuadrón (ver sim/ai/formations.js). */
-export const FORMATION = { V: 'V', COLUMN: 'COLUMN', PINCER: 'PINCER', DIVE: 'DIVE' };
+export const FORMATION = { V: 'V', COLUMN: 'COLUMN', PINCER: 'PINCER', DIVE: 'DIVE', ECHELON: 'ECHELON', STRAFE: 'STRAFE' };
 
 export const BOSS = {
   ENTRY_SPEED: 160,
@@ -110,7 +110,10 @@ export const BOSS_TYPES = {
 
 export const PHASE_TYPE = { WAVE: 'WAVE', BOSS: 'BOSS' };
 
-/** Las oleadas llegan en escuadrones: se recorre `squadrons` en ciclo hasta generar `count` enemigos. */
+/**
+ * Las oleadas llegan en escuadrones: se eligen de `squadrons` al azar según `weight` (sin repetir
+ * el anterior) hasta generar `count` enemigos.
+ */
 export const PHASES = [
   {
     type: PHASE_TYPE.WAVE,
@@ -120,9 +123,11 @@ export const PHASES = [
     count: 20,
     squadronEvery: 3.2,
     squadrons: [
-      { formation: FORMATION.V, size: 5 },
-      { formation: FORMATION.COLUMN, size: 4 },
-      { formation: FORMATION.PINCER, size: 4 },
+      { formation: FORMATION.V, size: 5, weight: 3 },
+      { formation: FORMATION.COLUMN, size: 4, weight: 3 },
+      { formation: FORMATION.PINCER, size: 4, weight: 2 },
+      { formation: FORMATION.ECHELON, size: 4, weight: 2 },
+      { formation: FORMATION.STRAFE, size: 2, weight: 1 },
     ],
   },
   { type: PHASE_TYPE.BOSS, name: 'Darth Vader', objective: 'Derriba el TIE Advanced', boss: 'TIE_ADVANCED' },
@@ -134,10 +139,12 @@ export const PHASES = [
     count: 30,
     squadronEvery: 2.8,
     squadrons: [
-      { formation: FORMATION.DIVE, size: 3 },
-      { formation: FORMATION.PINCER, size: 4 },
-      { formation: FORMATION.V, size: 5 },
-      { formation: FORMATION.DIVE, size: 4 },
+      { formation: FORMATION.DIVE, size: 3, weight: 3 },
+      { formation: FORMATION.PINCER, size: 4, weight: 2 },
+      { formation: FORMATION.V, size: 5, weight: 2 },
+      { formation: FORMATION.DIVE, size: 4, weight: 2 },
+      { formation: FORMATION.ECHELON, size: 4, weight: 2 },
+      { formation: FORMATION.STRAFE, size: 3, weight: 2 },
     ],
   },
   { type: PHASE_TYPE.BOSS, name: 'Destructor Estelar', objective: 'Destruye el Star Destroyer', boss: 'STAR_DESTROYER' },

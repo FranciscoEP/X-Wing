@@ -1,4 +1,7 @@
 import { PHASE_BANNER_TIME, PHASE_TYPE, PHASES } from '../config.js';
+import { rand, weightedChoice } from '../core/utils.js';
+
+const INTERVAL_JITTER = 0.25; // ± fracción de `squadronEvery`: las oleadas no llegan a compás
 
 export const PHASE_STATUS = { IDLE: 'idle', INTRO: 'intro', ACTIVE: 'active', CLEAR: 'clear', DONE: 'done' };
 
@@ -56,7 +59,7 @@ export class PhaseManager {
     this.resolved = 0; // destruidos + escapados
     this.killed = 0;
     this.spawnTimer = 0;
-    this.squadronIndex = 0;
+    this.lastSquadron = null;
     this.damageTaken = 0;
   }
 
@@ -83,18 +86,21 @@ export class PhaseManager {
 
   /**
    * Devuelve el siguiente escuadrón ({ formation, size }) cuando toca generarlo, o null.
-   * Recorre `phase.squadrons` en ciclo y recorta el último para no pasar de `count`.
+   * Elige de `phase.squadrons` al azar según su `weight`, sin repetir el anterior, con un
+   * intervalo variable, y recorta el último para no pasar de `count`.
    */
   nextSquadron(dt) {
     const p = this.phase;
     if (!this.isActive || p.type !== PHASE_TYPE.WAVE || this.spawned >= p.count) return null;
     this.spawnTimer -= dt;
     if (this.spawnTimer > 0) return null;
-    this.spawnTimer = p.squadronEvery;
-    const spec = p.squadrons[this.squadronIndex++ % p.squadrons.length];
+    this.spawnTimer = p.squadronEvery * rand(1 - INTERVAL_JITTER, 1 + INTERVAL_JITTER);
+    const options = p.squadrons.length > 1 ? p.squadrons.filter((s) => s !== this.lastSquadron) : p.squadrons;
+    const spec = weightedChoice(options);
+    this.lastSquadron = spec;
     const size = Math.min(spec.size, p.count - this.spawned);
     this.spawned += size;
-    return { ...spec, size };
+    return { formation: spec.formation, size };
   }
 
   recordDamage(amount) {

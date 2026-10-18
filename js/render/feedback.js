@@ -36,6 +36,7 @@ export function bindVisualFeedback(events, { particles, effects }) {
     particles.explosion(boss.cx, boss.cy, { count: 120, speed: 420, size: 5 });
     effects.flash('#fff', 0.6);
   });
+  events.on('squadronBroken', ({ x, y, divers }) => divers && particles.text(x, y - 20, '¡ROMPEN FILAS!', '#ffb000'));
   events.on('enemyDodge', ({ enemy }) => particles.sparks(enemy.x + enemy.width, enemy.cy, '#9fd3ff', 4));
   events.on('vaderMode', ({ mode }) => mode === 'charge' && effects.shake(8, 0.4));
   events.on('superlaser', () => {

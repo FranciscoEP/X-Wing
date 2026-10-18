@@ -1,20 +1,67 @@
 import { CANVAS } from '../../config.js';
-import { rand } from '../../core/utils.js';
+import { clamp, rand } from '../../core/utils.js';
+
+const EDGE = 20; // px que una trayectoria deja libres arriba y abajo
 
 /**
  * Patrones de vuelo. Cada uno es un objeto con `update(enemy, dt, world)` que mueve `enemy.x`
  * y devuelve la altura de su trayectoria (sin contar la esquiva, que se suma aparte).
  */
 
-/** Avanza en línea recta ondulando. `phase` sincroniza (o desfasa) la onda entre compañeros. */
-export function cruise({ baseY, phase = rand(0, Math.PI * 2), wobble, freq = 2 }) {
+/**
+ * Avanza en línea recta ondulando. `phase` sincroniza (o desfasa) la onda entre compañeros.
+ * `drift` (px/s) desplaza la altura base mientras avanza, sin salir de la pantalla.
+ */
+export function cruise({ baseY, phase = rand(0, Math.PI * 2), wobble, freq = 2, drift = 0 }) {
   let t = phase;
+  let y = baseY;
   return {
     name: 'cruise',
     update(enemy, dt) {
       t += dt;
       enemy.x -= enemy.speed * dt;
-      return baseY + Math.sin(t * freq) * wobble;
+      if (drift) y = clamp(y + drift * dt, EDGE + wobble, CANVAS.HEIGHT - enemy.height - EDGE - wobble);
+      return y + Math.sin(t * freq) * wobble;
+    },
+  };
+}
+
+/**
+ * Hostigamiento: entra hasta `holdX`, se queda ahí `holdTime` segundos siguiendo con retraso la
+ * altura del jugador (más `lane`, para que los compañeros no se apilen) y luego se retira por
+ * la derecha. `retreat()` adelanta la retirada.
+ */
+export function strafe({ baseY, holdX, holdTime, lane = 0, track = 1.6, sway = 14, retreatFactor = 1.4 }) {
+  let state = 'approach';
+  let y = baseY;
+  let timer = holdTime;
+  let t = 0; // el vaivén arranca en 0: sin saltos al detenerse
+  return {
+    name: 'strafe',
+    get state() {
+      return state;
+    },
+    retreat() {
+      // Si aún no ha llegado, llega y se va enseguida: retirarse desde fuera de la pantalla
+      // dejaría una nave que nunca entra ni escapa y bloquearía el fin de la oleada.
+      if (state === 'approach') timer = 0;
+      else state = 'retreat';
+    },
+    update(enemy, dt, world) {
+      if (state === 'approach') {
+        enemy.x -= enemy.speed * dt;
+        if (enemy.x <= holdX) state = 'hold';
+      } else if (state === 'hold') {
+        t += dt;
+        const target = clamp(world.player.cy - enemy.height / 2 + lane, EDGE, CANVAS.HEIGHT - enemy.height - EDGE);
+        y += (target - y) * (1 - Math.exp(-track * dt));
+        enemy.x = holdX + Math.sin(t * 1.5) * sway;
+        timer -= dt;
+        if (timer <= 0) state = 'retreat';
+      } else {
+        enemy.x += enemy.speed * retreatFactor * dt;
+      }
+      return y;
     },
   };
 }

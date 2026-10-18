@@ -14,6 +14,8 @@ const ESCAPE_MARGIN = 60;
 /**
  * Caza imperial. Su vuelo lo decide `movement` (sim/ai/movement.js), al que se suma la esquiva
  * (`evasion`); al disparar anticipa el movimiento del jugador según la dificultad.
+ * Si pertenece a un escuadrón (`squadron`, ver sim/ai/squadron.js), es este quien decide
+ * cuándo dispara; si no, dispara por su cuenta.
  */
 export class Enemy extends Entity {
   constructor(type, difficulty, { x = SPAWN_X, y = rand(SPAWN.MIN_Y, CANVAS.HEIGHT - SPAWN.BOTTOM_MARGIN), movement = null, fromWave = false } = {}) {
@@ -35,6 +37,7 @@ export class Enemy extends Entity {
     this.hitFlash = 0;
     this.entered = false;
     this.escaped = false;
+    this.squadron = null;
   }
 
   update(dt, world) {
@@ -57,18 +60,28 @@ export class Enemy extends Entity {
   }
 
   tryFire(dt, world) {
+    if (this.squadron) return;
     this.fireTimer -= dt;
-    const onScreen = this.x < CANVAS.WIDTH - FIRE.RIGHT_MARGIN && this.y > 0 && this.y + this.height < CANVAS.HEIGHT;
-    const inFront = this.x > world.player.x + FIRE.MIN_DISTANCE_TO_PLAYER;
-    if (this.fireTimer > 0 || !onScreen || !inFront || world.player.dead) return;
+    if (this.fireTimer > 0 || !this.canFire(world)) return;
     this.fireTimer = 1 / this.fireRate + rand(-FIRE.JITTER, FIRE.JITTER);
-    world.spawnEnemyBullet(this.aimAt(world.player));
+    this.fireAt(world);
   }
 
-  /** Bala hacia donde estará el jugador (según aimLead), con cierta imprecisión. */
-  aimAt(target) {
+  /** En pantalla, por delante del jugador y con el jugador vivo. */
+  canFire(world) {
+    const onScreen = this.x < CANVAS.WIDTH - FIRE.RIGHT_MARGIN && this.y > 0 && this.y + this.height < CANVAS.HEIGHT;
+    const inFront = this.x > world.player.x + FIRE.MIN_DISTANCE_TO_PLAYER;
+    return onScreen && inFront && !world.player.dead;
+  }
+
+  fireAt(world, { lead } = {}) {
+    world.spawnEnemyBullet(this.aimAt(world.player, lead));
+  }
+
+  /** Bala hacia donde estará el jugador (según `lead`, por defecto aimLead), con cierta imprecisión. */
+  aimAt(target, lead = this.difficulty.aimLead) {
     const from = { x: this.x, y: this.cy };
-    const angle = interceptAngle(from, target, BULLET.ENEMY_SPEED, this.difficulty.aimLead) + rand(-BULLET.ENEMY_AIM_ERROR, BULLET.ENEMY_AIM_ERROR);
+    const angle = interceptAngle(from, target, BULLET.ENEMY_SPEED, lead) + rand(-BULLET.ENEMY_AIM_ERROR, BULLET.ENEMY_AIM_ERROR);
     return new Bullet(from.x, from.y, Math.cos(angle) * BULLET.ENEMY_SPEED, Math.sin(angle) * BULLET.ENEMY_SPEED, {
       damage: BULLET.ENEMY_DAMAGE,
       friendly: false,
