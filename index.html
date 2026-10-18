@@ -56,6 +56,14 @@
           <div class="alerts" data-ref="alerts" aria-live="polite"></div>
         </div>
 
+        <!-- Controles táctiles (solo en pantallas táctiles y durante la partida) -->
+        <div class="touch-controls" aria-hidden="true">
+          <div class="touch-stick" data-touch="stick"><span class="touch-knob"></span></div>
+          <div class="touch-btn touch-torpedo" data-touch="torpedo">Torp</div>
+          <div class="touch-btn touch-fire" data-touch="fire">Fuego</div>
+          <button class="touch-btn touch-pause" type="button" data-action="pause" tabindex="-1">❚❚</button>
+        </div>
+
         <!-- Cartel de fase -->
         <div class="banner" data-ref="banner" hidden>
           <p class="banner-kicker" data-ref="bannerKicker"></p>

@@ -27,6 +27,10 @@
   box-sizing: border-box;
 }
 
+html {
+  touch-action: manipulation; /* sin zoom con doble toque fuera del visor */
+}
+
 html,
 body {
   margin: 0;
@@ -65,6 +69,12 @@ body {
     0 0 0 1px rgba(0, 0, 0, 0.8),
     0 0 60px rgba(92, 225, 255, 0.12),
     inset 0 0 120px rgba(0, 0, 0, 0.6);
+  /* El visor es la superficie de control táctil: sin scroll, zoom ni selección */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 canvas {
@@ -696,6 +706,101 @@ kbd {
   animation: pulse 1.2s ease-in-out infinite;
 }
 
+/* --------------------------------------------------------------- controles táctiles */
+
+.touch-controls {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+  font-size: clamp(8px, 1.6cqw, 13px);
+}
+
+/* Joystick flotante: en reposo marca la zona; al tocar aparece bajo el dedo (--ox/--oy) */
+.touch-stick {
+  position: absolute;
+  left: var(--ox, 15cqw);
+  top: var(--oy, 41cqw);
+  width: clamp(72px, 17cqw, 150px);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, transparent 40%, rgba(92, 225, 255, 0.08) 41%, transparent 72%),
+    var(--panel);
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+.touch-stick[data-active='true'] {
+  border-color: var(--line-strong);
+  opacity: 1;
+  box-shadow: 0 0 24px rgba(92, 225, 255, 0.25);
+}
+
+.touch-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 42%;
+  aspect-ratio: 1;
+  translate: calc(-50% + var(--kx, 0px)) calc(-50% + var(--ky, 0px));
+  border: 1px solid var(--cyan);
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, rgba(92, 225, 255, 0.55), rgba(92, 225, 255, 0.12));
+  box-shadow: 0 0 14px rgba(92, 225, 255, 0.5);
+}
+
+.touch-btn {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--cyan);
+  font: 700 1em / 1 var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-btn:active,
+.touch-btn[data-pressed='true'] {
+  background: var(--panel-strong);
+  box-shadow: 0 0 24px currentColor, inset 0 0 18px currentColor;
+}
+
+.touch-fire {
+  right: 4cqw;
+  bottom: 4cqw;
+  width: clamp(64px, 15cqw, 130px);
+  border-width: 2px;
+  color: var(--red);
+  text-shadow: 0 0 10px rgba(255, 70, 85, 0.6);
+}
+
+.touch-torpedo {
+  right: calc(4cqw + clamp(64px, 15cqw, 130px) + 1.5cqw);
+  bottom: 9cqw;
+  width: clamp(46px, 10cqw, 90px);
+  color: var(--amber);
+  font-size: 0.85em;
+}
+
+.touch-pause {
+  right: 2cqw;
+  top: calc(2cqw + 7.5em);
+  width: clamp(36px, 5cqw, 52px);
+  color: var(--dim);
+  font-size: 0.9em;
+  letter-spacing: 0;
+}
+
 /* --------------------------------------------------------------- consola inferior */
 
 .console {
@@ -777,6 +882,32 @@ kbd {
   }
   .banner-title {
     font-size: clamp(14px, 5cqw, 28px);
+  }
+}
+
+/* Pantalla táctil: aparecen los controles en pantalla y sobran los atajos de teclado */
+@media (pointer: coarse) {
+  [data-state='playing'] .touch-controls {
+    display: block;
+  }
+
+  /* Sin la lista de atajos, el visor aprovecha esa altura */
+  .controls {
+    display: none;
+  }
+  .viewport {
+    width: min(1100px, 100%, calc((100dvh - 64px) * 16 / 9));
+  }
+
+  /* La esquina inferior izquierda es del joystick */
+  .powerups {
+    left: 50%;
+    flex-direction: row;
+    transform: translateX(-50%);
+  }
+
+  .hud .hint {
+    display: none;
   }
 }
 

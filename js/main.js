@@ -1,8 +1,10 @@
 import { ASSETS, CANVAS, PHASES } from './config.js';
 import { loadImages } from './core/assets.js';
 import { AudioManager } from './core/Audio.js';
+import { CombinedInput } from './core/CombinedInput.js';
 import { Input } from './core/Input.js';
 import { Storage } from './core/storage.js';
+import { TouchInput } from './core/TouchInput.js';
 import { Game } from './Game.js';
 import { Renderer } from './render/Renderer.js';
 import { CockpitUI } from './ui/CockpitUI.js';
@@ -29,6 +31,18 @@ function setupMuteButton(game, canvas) {
   });
 }
 
+/** Teclado + controles táctiles (solo se ven en pantallas táctiles, ver style.css). */
+function createInput(viewport) {
+  const touch = (name) => viewport.querySelector(`[data-touch='${name}']`);
+  const touchInput = new TouchInput({
+    surface: viewport,
+    stick: touch('stick'),
+    fire: touch('fire'),
+    torpedo: touch('torpedo'),
+  });
+  return new CombinedInput(new Input(window), touchInput);
+}
+
 async function boot() {
   const canvas = document.getElementById('game');
   canvas.width = CANVAS.WIDTH;
@@ -43,7 +57,7 @@ async function boot() {
   const storage = new Storage();
   const viewport = document.getElementById('viewport');
   const game = new Game({
-    input: new Input(window),
+    input: createInput(viewport),
     // `?silencio` arranca sin audio (útil para pruebas)
     audio: new AudioManager(ASSETS.sounds, { storage, forceMute: params.has('silencio') }),
     renderer: new Renderer(canvas.getContext('2d'), images),
@@ -56,6 +70,7 @@ async function boot() {
     actions: {
       start: () => game.retry(),
       resume: () => game.resume(),
+      pause: () => game.pause(),
       menu: () => game.toMenu(),
       selectDifficulty: (key) => game.selectDifficulty(key),
     },

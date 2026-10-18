@@ -55,8 +55,10 @@ export class Player extends Entity {
   update(dt, { moveX = 0, moveY = 0 } = {}) {
     if (this.dead) return;
 
-    // Normalizar diagonales para que no sean más rápidas.
-    const norm = moveX && moveY ? Math.SQRT1_2 : 1;
+    // Normalizar diagonales para que no sean más rápidas; un joystick analógico ya llega
+    // dentro del círculo unidad y no se toca.
+    const len = Math.hypot(moveX, moveY);
+    const norm = len > 1 ? 1 / len : 1;
     this.vx += moveX * norm * PLAYER.ACCEL * dt;
     this.vy += moveY * norm * PLAYER.ACCEL * dt;
     const damping = Math.exp(-PLAYER.FRICTION * dt);
