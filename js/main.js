@@ -1,4 +1,4 @@
-import { ASSETS, CANVAS, PHASES } from './config.js';
+import { ASSETS, CANVAS, MAX_RENDER_SCALE, PHASES } from './config.js';
 import { loadImages } from './core/assets.js';
 import { AudioManager } from './core/Audio.js';
 import { CombinedInput } from './core/CombinedInput.js';
@@ -6,6 +6,8 @@ import { Input } from './core/Input.js';
 import { Storage } from './core/storage.js';
 import { TouchInput } from './core/TouchInput.js';
 import { Game } from './Game.js';
+import { spriteToDataUrl } from './render/art/SpriteCache.js';
+import { PostFX } from './render/post/PostFX.js';
 import { Renderer } from './render/Renderer.js';
 import { CockpitUI } from './ui/CockpitUI.js';
 
@@ -43,10 +45,38 @@ function createInput(viewport) {
   return new CombinedInput(new Input(window), touchInput);
 }
 
-async function boot() {
+/**
+ * El juego se dibuja en el canvas 2D #game. Si hay WebGL2 (y no se pidió `?nofx`), un segundo
+ * canvas encima aplica el post-procesado y #game queda como fuente invisible.
+ */
+function setupCanvases(viewport, scale) {
   const canvas = document.getElementById('game');
-  canvas.width = CANVAS.WIDTH;
-  canvas.height = CANVAS.HEIGHT;
+  canvas.width = Math.round(CANVAS.WIDTH * scale);
+  canvas.height = Math.round(CANVAS.HEIGHT * scale);
+  if (params.has('nofx')) return { canvas, postFx: null };
+
+  const fxCanvas = document.createElement('canvas');
+  fxCanvas.className = 'fx-canvas';
+  fxCanvas.width = canvas.width;
+  fxCanvas.height = canvas.height;
+  fxCanvas.setAttribute('aria-hidden', 'true');
+  const postFx = PostFX.create(fxCanvas);
+  if (!postFx) return { canvas, postFx: null };
+
+  canvas.after(fxCanvas);
+  viewport.dataset.postfx = 'on';
+  // Si el navegador pierde el contexto WebGL, se vuelve a mostrar el canvas 2D sin efectos
+  fxCanvas.addEventListener('webglcontextlost', () => {
+    delete viewport.dataset.postfx;
+    fxCanvas.remove();
+  });
+  return { canvas, postFx };
+}
+
+async function boot() {
+  const viewport = document.getElementById('viewport');
+  const scale = Math.min(MAX_RENDER_SCALE, Math.max(1, window.devicePixelRatio || 1));
+  const { canvas, postFx } = setupCanvases(viewport, scale);
 
   const [images] = await Promise.all([
     loadImages(ASSETS.images),
@@ -55,18 +85,18 @@ async function boot() {
   ]);
 
   const storage = new Storage();
-  const viewport = document.getElementById('viewport');
+  const renderer = new Renderer({ canvas, images, scale, postFx });
   const game = new Game({
     input: createInput(viewport),
     // `?silencio` arranca sin audio (útil para pruebas)
     audio: new AudioManager(ASSETS.sounds, { storage, forceMute: params.has('silencio') }),
-    renderer: new Renderer(canvas.getContext('2d'), images),
+    renderer,
     storage,
     startPhase: startPhaseFromUrl(),
   });
 
   game.ui = new CockpitUI(viewport, {
-    playerIcon: ASSETS.images.player,
+    playerIcon: spriteToDataUrl(renderer.sprites.player) ?? ASSETS.images.player,
     actions: {
       start: () => game.retry(),
       resume: () => game.resume(),

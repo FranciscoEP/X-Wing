@@ -71,8 +71,6 @@ export class Particles {
       ctx.globalAlpha = 1 - p;
       ctx.strokeStyle = w.color;
       ctx.lineWidth = 6 * (1 - p) + 1;
-      ctx.shadowColor = w.color;
-      ctx.shadowBlur = 20;
       ctx.beginPath();
       ctx.arc(w.x, w.y, w.radius * p, 0, Math.PI * 2);
       ctx.stroke();

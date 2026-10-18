@@ -1,6 +1,11 @@
 import { rand } from '../core/utils.js';
 
-/** Sacudida de cámara y destellos de pantalla completa. */
+const MAX_WAVES = 8;
+
+/**
+ * Efectos de cámara: sacudida y destello (canvas 2D) y, para el post-procesado WebGL,
+ * ondas expansivas de distorsión. Solo estado: las ondas las dibuja PostFX.
+ */
 export class Effects {
   constructor() {
     this.shakeTime = 0;
@@ -9,6 +14,7 @@ export class Effects {
     this.flashColor = '#fff';
     this.flashTime = 0;
     this.flashDuration = 0;
+    this.waves = [];
   }
 
   shake(intensity, duration) {
@@ -23,9 +29,27 @@ export class Effects {
     this.flashDuration = this.flashTime = duration;
   }
 
+  /** Onda que se expande desde (x, y) hasta `radius` px en `duration` s. */
+  wave(x, y, { radius = 200, duration = 0.6, strength = 1 } = {}) {
+    this.waves.push({ x, y, maxRadius: radius, duration, strength, age: 0 });
+    if (this.waves.length > MAX_WAVES) this.waves.shift();
+  }
+
   update(dt) {
     this.shakeTime = Math.max(0, this.shakeTime - dt);
     this.flashTime = Math.max(0, this.flashTime - dt);
+    for (const w of this.waves) w.age += dt;
+    this.waves = this.waves.filter((w) => w.age < w.duration);
+  }
+
+  /** Estado para PostFX: ondas con su radio actual y fuerza decreciente. */
+  postState() {
+    return {
+      waves: this.waves.map((w) => {
+        const p = w.age / w.duration;
+        return { x: w.x, y: w.y, radius: w.maxRadius * p, strength: w.strength * (1 - p) };
+      }),
+    };
   }
 
   applyShake(ctx) {

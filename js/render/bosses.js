@@ -2,24 +2,25 @@ import { rand } from '../core/utils.js';
 import { LASER, LASER_STATE, RADIUS } from '../sim/bosses/DeathStar.js';
 import { TURRETS } from '../sim/bosses/StarDestroyer.js';
 import { CHARGE, VADER_MODE } from '../sim/bosses/TieAdvanced.js';
+import { drawSprite } from './art/SpriteCache.js';
+
+const HIT_FLASH = 'rgba(255, 255, 255, 0.35)';
 
 /**
  * Dibujo de cada jefe, indexado por `boss.type`. `body` va bajo el jugador y `overlay` encima.
- * Para un jefe nuevo, añade aquí su entrada.
+ * `assets` = { sprites, time, flash }. Para un jefe nuevo, añade aquí su entrada.
+ * El destello de impacto no usa `ctx.filter` (no funciona en Safari): cada jefe lo pinta.
  */
 export const BOSS_RENDERERS = {
-  TIE_ADVANCED: { body: drawTieAdvanced, overlay: drawVaderOverlay, filter: 'brightness(0.7) contrast(1.3)' },
+  TIE_ADVANCED: { body: drawTieAdvanced, overlay: drawVaderOverlay },
   STAR_DESTROYER: { body: drawStarDestroyer },
   DEATH_STAR: { body: drawDeathStar, overlay: drawSuperlaser },
 };
 
 export function drawBoss(ctx, boss, assets) {
-  const renderer = BOSS_RENDERERS[boss.type];
   ctx.save();
-  const filter = `${renderer.filter ?? ''} ${boss.hitFlash > 0 ? 'brightness(1.8)' : ''}`.trim();
-  if (filter) ctx.filter = filter;
   if (boss.dying) ctx.translate(rand(-3, 3), rand(-3, 3));
-  renderer.body(ctx, boss, assets);
+  BOSS_RENDERERS[boss.type].body(ctx, boss, { ...assets, flash: boss.hitFlash > 0 });
   ctx.restore();
 }
 
@@ -27,19 +28,29 @@ export function drawBossOverlay(ctx, boss, assets) {
   BOSS_RENDERERS[boss.type].overlay?.(ctx, boss, assets);
 }
 
-function drawTieAdvanced(ctx, boss, { images }) {
-  // Estela durante la embestida
+function drawTieAdvanced(ctx, boss, { sprites, flash }) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  // Estela roja durante la embestida
   if (boss.mode === VADER_MODE.CHARGE) {
-    const trail = ctx.createLinearGradient(boss.x + boss.width, 0, boss.x + boss.width + 160, 0);
-    trail.addColorStop(0, 'rgba(255, 60, 60, 0.6)');
-    trail.addColorStop(1, 'rgba(255, 60, 60, 0)');
+    const x = boss.x + boss.width * 0.6;
+    const trail = ctx.createLinearGradient(x, 0, x + 200, 0);
+    trail.addColorStop(0, 'rgba(255, 70, 70, 0.6)');
+    trail.addColorStop(1, 'rgba(255, 70, 70, 0)');
     ctx.fillStyle = trail;
-    ctx.fillRect(boss.x + boss.width / 2, boss.y + boss.height * 0.3, 160 + boss.width / 2, boss.height * 0.4);
+    ctx.fillRect(x, boss.cy - boss.height * 0.18, 200, boss.height * 0.36);
   }
-  const windup = boss.mode === VADER_MODE.WINDUP;
-  ctx.shadowColor = '#ff2e2e';
-  ctx.shadowBlur = windup ? 40 : 18;
-  if (images.tie) ctx.drawImage(images.tie, boss.x, boss.y, boss.width, boss.height);
+  // Halo rojo que crece durante el aviso de embestida
+  if (boss.mode === VADER_MODE.WINDUP) {
+    const p = 1 - boss.modeTimer / CHARGE.WINDUP;
+    const halo = ctx.createRadialGradient(boss.cx, boss.cy, 0, boss.cx, boss.cy, boss.width * (0.5 + p * 0.4));
+    halo.addColorStop(0, `rgba(255, 50, 50, ${0.3 + p * 0.4})`);
+    halo.addColorStop(1, 'rgba(255, 50, 50, 0)');
+    ctx.fillStyle = halo;
+    ctx.fillRect(boss.x - boss.width, boss.y - boss.height, boss.width * 3, boss.height * 3);
+  }
+  ctx.restore();
+  drawSprite(ctx, sprites.vader, boss.cx, boss.cy, { flash });
 }
 
 /** Aviso de embestida (franja roja) y escudo deflector, por encima del jugador. */
@@ -72,7 +83,7 @@ function drawVaderOverlay(ctx, boss, { time }) {
   }
 }
 
-function drawStarDestroyer(ctx, boss, { time }) {
+function drawStarDestroyer(ctx, boss, { time, flash }) {
   const { x, y, width: w, height: h } = boss;
   const grad = ctx.createLinearGradient(x, y, x, y + h);
   grad.addColorStop(0, '#c9ced6');
@@ -90,6 +101,10 @@ function drawStarDestroyer(ctx, boss, { time }) {
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+  if (flash) {
+    ctx.fillStyle = HIT_FLASH;
+    ctx.fill();
+  }
 
   // Línea central y paneles
   ctx.strokeStyle = 'rgba(40, 45, 55, 0.7)';
@@ -132,7 +147,7 @@ function drawStarDestroyer(ctx, boss, { time }) {
   }
 }
 
-function drawDeathStar(ctx, boss, { time }) {
+function drawDeathStar(ctx, boss, { time, flash }) {
   const { cx, cy } = boss;
 
   // Esfera
@@ -144,6 +159,10 @@ function drawDeathStar(ctx, boss, { time }) {
   ctx.beginPath();
   ctx.arc(cx, cy, RADIUS, 0, Math.PI * 2);
   ctx.fill();
+  if (flash) {
+    ctx.fillStyle = HIT_FLASH;
+    ctx.fill();
+  }
 
   // Trinchera ecuatorial y paneles
   ctx.save();

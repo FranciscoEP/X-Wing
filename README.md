@@ -31,7 +31,12 @@ Los ES modules no cargan desde `file://`, así que sirve la carpeta con cualquie
 python3 -m http.server 8000
 ```
 
-y abre http://localhost:8000. Parámetros útiles: `?silencio` arranca sin audio, `?fase=N` empieza en la fase N y `?debug` expone el juego en la consola como `window.xwing`.
+y abre http://localhost:8000. Parámetros útiles: `?silencio` arranca sin audio, `?fase=N` empieza en la fase N `?debug` expone el juego en la consola como `window.xwing` y `?nofx` desactiva el post-procesado WebGL.
+
+## Gráficos
+
+- Las naves usan los PNG del juego, precalculados una vez por resolución de pantalla (nítidos en retina) con su versión de destello para los impactos y el halo rojo del Interceptor y de Vader.
+- Si el navegador tiene WebGL2, un post-procesado añade **bloom** (brillo real en láseres, motores, explosiones y superláser) y **ondas de choque** que distorsionan la imagen en torpedos y explosiones grandes. Sin WebGL2 el juego se ve igual, sin esos efectos.
 
 ## Pruebas
 
@@ -60,7 +65,9 @@ js/
 │   ├── entities/        # Player, Enemy, Bullet, Torpedo, PowerUp
 │   └── bosses/          # Boss (base), TieAdvanced, StarDestroyer, DeathStar, registry
 ├── render/              # Canvas: mundo, jefes, partículas, efectos, fondo
-│                        # feedback.js traduce eventos de la simulación a efectos y sonido
+│   ├── art/SpriteCache.js  # Sprites precalculados de los PNG (alta calidad, destello, halo)
+│   ├── post/            # PostFX (WebGL2): bloom y ondas de choque sobre el canvas 2D
+│   └── feedback.js      # Traduce eventos de la simulación a efectos y sonido
 └── ui/                  # Cabina en HTML+CSS
     ├── viewModel.js     # Funciones puras: qué mostrar (probadas en Node)
     └── CockpitUI.js     # Pinta el DOM solo cuando algo cambia

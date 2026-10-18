@@ -84,6 +84,17 @@ canvas {
   outline: none;
 }
 
+/* Con post-procesado, #game es solo la fuente: se ve el canvas WebGL que va encima */
+.fx-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+[data-postfx='on'] #game {
+  opacity: 0;
+}
+
 /* Viñeta y líneas de barrido: sensación de pantalla de cabina */
 .scanlines {
   position: absolute;

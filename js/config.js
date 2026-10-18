@@ -177,3 +177,6 @@ export const ASSETS = {
 };
 
 export const STORAGE_KEYS = { HIGH_SCORE: 'xwing.highscore', MUTED: 'xwing.muted' };
+
+/** Escala máxima del canvas en pantallas HiDPI (retina). Más alta = más nítido pero más costoso. */
+export const MAX_RENDER_SCALE = 2;
