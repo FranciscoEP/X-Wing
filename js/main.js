@@ -2,15 +2,21 @@ import { ASSETS, CANVAS, PHASES } from './config.js';
 import { loadImages } from './core/assets.js';
 import { AudioManager } from './core/Audio.js';
 import { Input } from './core/Input.js';
+import { Storage } from './core/storage.js';
 import { Game } from './Game.js';
+import { Renderer } from './render/Renderer.js';
+
+// Único punto de contacto con el DOM: construye las dependencias y se las pasa a Game.
+
+const params = new URLSearchParams(location.search);
 
 /** `?fase=4` empieza directamente en esa fase (útil para probar jefes). */
 function startPhaseFromUrl() {
-  const n = Number(new URLSearchParams(location.search).get('fase'));
+  const n = Number(params.get('fase'));
   return Number.isInteger(n) && n >= 1 && n <= PHASES.length ? n - 1 : 0;
 }
 
-function setupMuteButton(game) {
+function setupMuteButton(game, canvas) {
   const button = document.getElementById('mute-button');
   game.audio.onChange((muted) => {
     button.textContent = muted ? '🔇 Sonido: no' : '🔊 Sonido: sí';
@@ -18,8 +24,7 @@ function setupMuteButton(game) {
   });
   button.addEventListener('click', () => {
     game.toggleMute();
-    // Devolver el foco al canvas para que el teclado siga controlando la nave
-    document.getElementById('game').focus();
+    canvas.focus(); // que el teclado siga controlando la nave
   });
 }
 
@@ -34,14 +39,20 @@ async function boot() {
     document.fonts?.load('bold 16px "Orbitron"').catch(() => {}),
   ]);
 
-  const game = new Game(canvas, {
-    images,
+  const storage = new Storage();
+  const game = new Game({
+    input: new Input(window),
     // `?silencio` arranca sin audio (útil para pruebas)
-    audio: new AudioManager(ASSETS.sounds, { forceMute: new URLSearchParams(location.search).has('silencio') }),
-    input: new Input(),
+    audio: new AudioManager(ASSETS.sounds, { storage, forceMute: params.has('silencio') }),
+    renderer: new Renderer(canvas.getContext('2d'), images),
+    storage,
     startPhase: startPhaseFromUrl(),
   });
-  setupMuteButton(game);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) game.pause();
+  });
+  setupMuteButton(game, canvas);
   document.body.classList.add('ready');
   canvas.focus();
   game.start();

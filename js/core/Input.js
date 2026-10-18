@@ -1,16 +1,24 @@
-/** Estado del teclado: `isDown` para acciones continuas, `consume` para pulsaciones únicas. */
+import { KEYS } from '../config.js';
+
+// Teclas cuyo comportamiento por defecto (scroll) se bloquea.
+const BLOCKED_DEFAULTS = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+
+/**
+ * Estado del teclado: `isDown` para acciones continuas, `consume` para pulsaciones únicas.
+ * `target` es inyectable para poder probarlo con un EventTarget cualquiera.
+ */
 export class Input {
-  constructor(target = window) {
+  constructor(target = globalThis.window) {
     this.down = new Set();
     this.pressed = new Set();
 
     target.addEventListener('keydown', (e) => {
-      if (GAME_KEYS.has(e.code)) e.preventDefault();
+      if (BLOCKED_DEFAULTS.has(e.code)) e.preventDefault();
       if (!this.down.has(e.code)) this.pressed.add(e.code);
       this.down.add(e.code);
     });
     target.addEventListener('keyup', (e) => this.down.delete(e.code));
-    window.addEventListener('blur', () => this.down.clear());
+    target.addEventListener('blur', () => this.down.clear());
   }
 
   isDown(codes) {
@@ -26,7 +34,15 @@ export class Input {
   endFrame() {
     this.pressed.clear();
   }
-}
 
-// Teclas cuyo comportamiento por defecto (scroll) se bloquea.
-const GAME_KEYS = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+  /** Traduce el teclado a los controles abstractos que entiende la simulación. */
+  readControls() {
+    const axis = (neg, pos) => (this.isDown(pos) ? 1 : 0) - (this.isDown(neg) ? 1 : 0);
+    return {
+      moveX: axis(KEYS.LEFT, KEYS.RIGHT),
+      moveY: axis(KEYS.UP, KEYS.DOWN),
+      shoot: this.isDown(KEYS.SHOOT),
+      torpedo: this.consume(KEYS.TORPEDO),
+    };
+  }
+}

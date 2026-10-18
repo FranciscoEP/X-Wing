@@ -1,30 +1,52 @@
-import { load, save } from './storage.js';
+const VOICES_PER_SOUND = 4;
 
-/** Sonidos con polifonía simple (clona el nodo) y silencio global persistente. */
+/**
+ * Música y efectos con silencio global persistente.
+ * Cada efecto usa un pool fijo de elementos de audio que se reutilizan en ronda: así no se
+ * crea un objeto nuevo por disparo (antes se generaban ~12 por segundo para el recolector).
+ * `createAudio` es inyectable para poder probarlo sin navegador.
+ */
 export class AudioManager {
-  constructor(sounds, { forceMute = false } = {}) {
+  constructor(sounds, { storage, forceMute = false, createAudio = (src) => new Audio(src), now = () => performance.now() / 1000 }) {
     this.sources = sounds;
-    this.muted = forceMute || load('xwing.muted') === '1';
+    this.storage = storage;
+    this.createAudio = createAudio;
+    this.now = now;
+    this.muted = forceMute || storage.muted;
     this.listeners = [];
-    this.music = new Audio(sounds.music);
+    this.music = createAudio(sounds.music);
     this.music.loop = true;
     this.music.volume = 0.35;
     this.lastPlayed = {};
+    this.pools = {};
+  }
+
+  /** Siguiente voz libre (en ronda) del pool de `name`, creándolo la primera vez. */
+  voice(name) {
+    const pool = (this.pools[name] ??= { voices: [], next: 0 });
+    if (pool.voices.length < VOICES_PER_SOUND) {
+      pool.voices.push(this.createAudio(this.sources[name]));
+      return pool.voices.at(-1);
+    }
+    const voice = pool.voices[pool.next];
+    pool.next = (pool.next + 1) % VOICES_PER_SOUND;
+    voice.currentTime = 0;
+    return voice;
   }
 
   play(name, { volume = 0.4, minGap = 0.05 } = {}) {
     if (this.muted || !this.sources[name]) return;
-    const now = performance.now() / 1000;
-    if (now - (this.lastPlayed[name] ?? 0) < minGap) return;
+    const now = this.now();
+    if (now - (this.lastPlayed[name] ?? -Infinity) < minGap) return;
     this.lastPlayed[name] = now;
-    const sfx = new Audio(this.sources[name]);
+    const sfx = this.voice(name);
     sfx.volume = volume;
-    sfx.play().catch(() => {});
+    sfx.play()?.catch?.(() => {});
   }
 
   startMusic() {
     if (this.muted) return;
-    this.music.play().catch(() => {});
+    this.music.play()?.catch?.(() => {});
   }
 
   stopMusic() {
@@ -37,12 +59,12 @@ export class AudioManager {
     listener(this.muted);
   }
 
-  /** `resumeMusic` indica si la música debe sonar al reactivar el audio (solo durante la partida). */
+  /** `resumeMusic` indica si la música debe volver a sonar al reactivar el audio. */
   toggleMute(resumeMusic) {
     this.muted = !this.muted;
-    save('xwing.muted', this.muted ? '1' : '0');
+    this.storage.muted = this.muted;
     if (this.muted) this.music.pause();
-    else if (resumeMusic) this.music.play().catch(() => {});
+    else if (resumeMusic) this.music.play()?.catch?.(() => {});
     this.listeners.forEach((fn) => fn(this.muted));
     return this.muted;
   }

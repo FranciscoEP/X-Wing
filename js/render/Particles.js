@@ -7,11 +7,18 @@ export class Particles {
   constructor() {
     this.items = [];
     this.texts = [];
+    this.waves = [];
   }
 
   clear() {
     this.items.length = 0;
     this.texts.length = 0;
+    this.waves.length = 0;
+  }
+
+  /** Anillo que se expande hasta `radius` (onda expansiva del torpedo). */
+  shockwave(x, y, radius, color = '#8fd3ff', duration = 0.45) {
+    this.waves.push({ x, y, radius, color, life: duration, duration });
   }
 
   explosion(x, y, { count = 30, speed = 260, size = 3, colors = EXPLOSION_COLORS } = {}) {
@@ -51,11 +58,27 @@ export class Particles {
       t.y -= 40 * dt;
       t.life -= dt;
     }
+    for (const w of this.waves) w.life -= dt;
     this.items = this.items.filter((p) => p.life > 0);
+    this.waves = this.waves.filter((w) => w.life > 0);
     this.texts = this.texts.filter((t) => t.life > 0);
   }
 
   draw(ctx) {
+    ctx.save();
+    for (const w of this.waves) {
+      const p = 1 - w.life / w.duration;
+      ctx.globalAlpha = 1 - p;
+      ctx.strokeStyle = w.color;
+      ctx.lineWidth = 6 * (1 - p) + 1;
+      ctx.shadowColor = w.color;
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.arc(w.x, w.y, w.radius * p, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (const p of this.items) {

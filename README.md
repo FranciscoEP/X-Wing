@@ -10,7 +10,7 @@ Shooter espacial en Canvas + JavaScript (ES modules, sin dependencias ni build).
 | --- | --- |
 | Mover | `WASD` o flechas |
 | Disparar | `J` o `Espacio` (mantener) |
-| Torpedo protón (limpia la pantalla) | `K` |
+| Torpedo protón (explota en área) | `K` |
 | Pausa | `P` o `Esc` (`Q` en pausa vuelve al menú) |
 | Silenciar | `M` o el botón «Sonido» bajo el juego |
 
@@ -26,18 +26,43 @@ python3 -m http.server 8000
 
 y abre http://localhost:8000. Parámetros útiles: `?silencio` arranca sin audio y `?fase=N` empieza en la fase N.
 
-## Estructura
+## Pruebas
+
+Sin dependencias: usan el runner nativo de Node (≥ 20).
+
+```bash
+npm test
+```
+
+Incluyen pruebas unitarias (jugador, enemigos, jefes, fases, power-ups, input, audio, storage), regresiones de los bugs reportados, validación de `config.js`, pruebas de memoria y partidas completas simuladas con piloto automático en las tres dificultades. Se ejecutan en GitHub Actions en cada push y PR.
+
+## Arquitectura
 
 ```
 js/
-├── main.js              # Arranque: carga assets y crea el juego
-├── config.js            # Constantes: fases, dificultades, power-ups, assets
-├── Game.js              # Bucle, estados (menú/juego/pausa/fin) y colisiones
-├── core/                # Input, audio, carga de imágenes, storage, utilidades
-├── entities/            # Player, Enemy, Bullet, PowerUp
-│   └── bosses/          # Boss (base), TieAdvanced, StarDestroyer, DeathStar
-├── systems/             # PhaseManager, Particles, Effects, Background
-└── ui/                  # HUD, pantallas y helpers de dibujo
+├── main.js              # Único punto con DOM: crea dependencias y arranca Game
+├── Game.js              # Máquina de estados (menú/juego/pausa/fin) y bucle
+├── config.js            # Todo el balance: fases, daños, hitboxes, power-ups…
+├── core/                # Input, audio, storage, EventBus, random con semilla, utilidades
+├── sim/                 # Simulación pura (sin DOM, se ejecuta en Node)
+│   ├── World.js         # Una partida: entidades, combate, puntuación, eventos
+│   ├── collisions.js    # Reglas de colisión
+│   ├── powerups.js      # Registro de efectos de power-ups
+│   ├── PhaseManager.js  # Secuencia de fases
+│   ├── entities/        # Player, Enemy, Bullet, Torpedo, PowerUp
+│   └── bosses/          # Boss (base), TieAdvanced, StarDestroyer, DeathStar, registry
+├── render/              # Dibujo: Renderer, entidades, jefes, partículas, efectos, fondo
+│                        # feedback.js traduce eventos de la simulación a efectos y sonido
+└── ui/                  # HUD (con modelo de vista) y pantallas
+tests/                   # node --test
+docs/code-smells.md      # Smells encontrados y cómo se resolvieron
 ```
 
-Para añadir una fase basta con agregar una entrada a `PHASES` en `config.js`; para un jefe nuevo, extiende `Boss` y regístralo en `entities/bosses/index.js`.
+La simulación (`sim/`) no sabe nada del navegador: recibe controles abstractos (`{ moveX, moveY, shoot, torpedo }`) y publica eventos. Eso permite probarla y ejecutar partidas completas en milisegundos.
+
+### Cómo extender
+
+- **Nueva fase:** añade una entrada a `PHASES` en `config.js`.
+- **Nuevo enemigo:** entrada en `ENEMY_TYPES`.
+- **Nuevo jefe:** extiende `Boss` en `sim/bosses/`, regístralo en `sim/bosses/registry.js`, añade sus datos a `BOSS_TYPES` y su dibujo a `BOSS_RENDERERS` (`render/bosses.js`). `config.test.js` falla si falta alguna pieza.
+- **Nuevo power-up:** entrada en `POWERUPS` y su efecto en `sim/powerups.js`.

@@ -1,4 +1,5 @@
 // Configuración central del juego. Velocidades en px/s, tiempos en segundos.
+// Todo valor de balance vive aquí: la lógica no debe contener números mágicos.
 
 export const CANVAS = { WIDTH: 960, HEIGHT: 540 };
 
@@ -8,30 +9,69 @@ export const KEYS = {
   LEFT: ['KeyA', 'ArrowLeft'],
   RIGHT: ['KeyD', 'ArrowRight'],
   SHOOT: ['KeyJ', 'Space'],
-  BOMB: ['KeyK'],
+  TORPEDO: ['KeyK'],
   PAUSE: ['KeyP', 'Escape'],
   CONFIRM: ['Enter'],
+  QUIT: ['KeyQ'],
   MUTE: ['KeyM'],
 };
 
 export const PLAYER = {
   WIDTH: 72,
   HEIGHT: 68,
+  START_X: 80,
+  MARGIN: 8,
+  MAX_X_RATIO: 0.75, // no puede pasar del 75% del ancho
   ACCEL: 2600,
   MAX_SPEED: 360,
   FRICTION: 8,
   MAX_HP: 100,
   FIRE_COOLDOWN: 0.16,
+  CANNON_OFFSET: 18, // distancia vertical de cada cañón al centro de la nave
+  RAPID_FIRE_FACTOR: 0.5,
   HIT_INVULNERABILITY: 1,
   RESPAWN_INVULNERABILITY: 2.5,
-  START_BOMBS: 2,
+  START_TORPEDOES: 2,
+  MAX_TORPEDOES: 5,
 };
 
 export const BULLET = {
   PLAYER_SPEED: 900,
   PLAYER_DAMAGE: 10,
+  TRIPLE_SPREAD: 0.22, // componente vertical relativa de los disparos laterales
   ENEMY_SPEED: 380,
   ENEMY_DAMAGE: 10,
+  ENEMY_AIM_ERROR: 0.12, // radianes
+};
+
+/**
+ * Cuánto se reduce por cada lado la hitbox del OBJETIVO (px). Más alto = más permisivo.
+ * El jugador mide 72x68: con 16 su zona vulnerable a balas es el núcleo de 40x36.
+ */
+export const HITBOX = {
+  ENEMY_VS_BULLET: 4,
+  PLAYER_VS_BULLET: 16,
+  PLAYER_VS_ENEMY: 12,
+  PLAYER_VS_BOSS: 16,
+  PLAYER_VS_LASER: 10,
+};
+
+/** Torpedo protón (tecla K): proyectil visible que explota con onda expansiva. */
+export const TORPEDO = {
+  SPEED: 520,
+  SIZE: 16,
+  MAX_FLIGHT: 1.4, // segundos antes de detonar solo
+  BLAST_RADIUS: 170,
+  CLEAR_BULLETS_RADIUS: 260,
+  ENEMY_DAMAGE: 60,
+  BOSS_DAMAGE: 120, // solo con impacto directo (en la Estrella de la Muerte, en el puerto)
+};
+
+export const COMBAT = {
+  ENEMY_CONTACT_DAMAGE: 30,
+  BOSS_CONTACT_DAMAGE: 25,
+  BOSS_CLEAR_HEAL: 40,
+  RESPAWN_DELAY: 1.5,
 };
 
 export const DIFFICULTIES = {
@@ -39,28 +79,46 @@ export const DIFFICULTIES = {
   NORMAL: { label: 'Piloto Rebelde', lives: 3, enemySpeed: 1, enemyFire: 1, bossHp: 1, dropRate: 0.15 },
   HARD: { label: 'As de la Alianza', lives: 2, enemySpeed: 1.3, enemyFire: 1.4, bossHp: 1.5, dropRate: 0.1 },
 };
+export const DEFAULT_DIFFICULTY = 'NORMAL';
 
 export const ENEMY_TYPES = {
   TIE_FIGHTER: { hp: 20, speed: 140, fireRate: 0.5, score: 100, size: 56, wobble: 30 },
   TIE_INTERCEPTOR: { hp: 30, speed: 220, fireRate: 0.8, score: 150, size: 50, wobble: 70 },
 };
 
+export const BOSS = {
+  ENTRY_SPEED: 160,
+  DEATH_DURATION: 2.2,
+};
+
+export const BOSS_TYPES = {
+  TIE_ADVANCED: { name: 'TIE Advanced x1 — Darth Vader', hp: 600, score: 3000, width: 110, height: 92 },
+  STAR_DESTROYER: { name: 'Destructor Estelar clase Imperial', hp: 1200, score: 6000, width: 400, height: 190 },
+  DEATH_STAR: { name: 'Estrella de la Muerte', hp: 700, score: 15000, width: 420, height: 420 },
+};
+
+export const PHASE_TYPE = { WAVE: 'WAVE', BOSS: 'BOSS' };
+
 export const PHASES = [
-  { type: 'WAVE', name: 'Escuadrón TIE', objective: 'Destruye 20 TIE Fighters', enemy: 'TIE_FIGHTER', count: 20, spawnEvery: 0.9 },
-  { type: 'BOSS', name: 'Darth Vader', objective: 'Derriba el TIE Advanced', boss: 'TIE_ADVANCED' },
-  { type: 'WAVE', name: 'Asalto Interceptor', objective: 'Destruye 30 Interceptores', enemy: 'TIE_INTERCEPTOR', count: 30, spawnEvery: 0.7 },
-  { type: 'BOSS', name: 'Destructor Estelar', objective: 'Destruye el Star Destroyer', boss: 'STAR_DESTROYER' },
-  { type: 'BOSS', name: 'Estrella de la Muerte', objective: 'Dispara al puerto de escape', boss: 'DEATH_STAR' },
+  { type: PHASE_TYPE.WAVE, name: 'Escuadrón TIE', objective: 'Destruye 20 TIE Fighters', enemy: 'TIE_FIGHTER', count: 20, spawnEvery: 0.9 },
+  { type: PHASE_TYPE.BOSS, name: 'Darth Vader', objective: 'Derriba el TIE Advanced', boss: 'TIE_ADVANCED' },
+  { type: PHASE_TYPE.WAVE, name: 'Asalto Interceptor', objective: 'Destruye 30 Interceptores', enemy: 'TIE_INTERCEPTOR', count: 30, spawnEvery: 0.7 },
+  { type: PHASE_TYPE.BOSS, name: 'Destructor Estelar', objective: 'Destruye el Star Destroyer', boss: 'STAR_DESTROYER' },
+  { type: PHASE_TYPE.BOSS, name: 'Estrella de la Muerte', objective: 'Dispara al puerto de escape', boss: 'DEATH_STAR' },
 ];
 
-// duration en segundos; los que no tienen duración son instantáneos.
+export const PHASE_BANNER_TIME = 2.5;
+
+// `duration` en segundos = efecto temporal; el resto se aplica al instante (ver sim/powerups.js).
 export const POWERUPS = {
   TRIPLE_SHOT: { label: 'Disparo triple', color: '#ff7a1a', icon: 'III', duration: 10, weight: 4 },
   RAPID_FIRE: { label: 'Fuego rápido', color: '#ff2e63', icon: '»', duration: 8, weight: 3 },
   SHIELD: { label: 'Escudo', color: '#22d3ee', icon: 'S', duration: 6, weight: 3 },
-  REPAIR: { label: 'Reparación', color: '#4ade80', icon: '+', weight: 3 },
-  BOMB: { label: 'Torpedo protón', color: '#facc15', icon: 'B', weight: 2 },
+  REPAIR: { label: 'Reparación', color: '#4ade80', icon: '+', heal: 40, weight: 3 },
+  TORPEDO: { label: 'Torpedo protón', color: '#facc15', icon: 'B', torpedoes: 1, weight: 2 },
 };
+
+export const POWERUP_ITEM = { SIZE: 28, DRIFT_SPEED: 60, LIFETIME: 10, BLINK_BEFORE_END: 3 };
 
 export const SCORE = {
   POWERUP: 50,
@@ -72,8 +130,6 @@ export const ASSETS = {
   images: {
     player: 'images/xwing2.png',
     tie: 'images/Caza.png',
-    playerBullet: 'images/bulletBuenos.png',
-    enemyBullet: 'images/BulletMalos.png',
     background: 'images/zoey.png',
   },
   sounds: {
@@ -83,4 +139,4 @@ export const ASSETS = {
   },
 };
 
-export const STORAGE_KEY = 'xwing.highscore';
+export const STORAGE_KEYS = { HIGH_SCORE: 'xwing.highscore', MUTED: 'xwing.muted' };

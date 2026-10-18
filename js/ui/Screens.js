@@ -1,4 +1,5 @@
-import { CANVAS, DIFFICULTIES } from '../config.js';
+import { CANVAS, DIFFICULTIES, SCORE } from '../config.js';
+import { PHASE_STATUS } from '../sim/PhaseManager.js';
 import { COLORS, text } from './theme.js';
 
 const W = CANVAS.WIDTH;
@@ -60,8 +61,19 @@ export function drawEnd(ctx, { victory, score, highScore, newRecord, time }) {
   }
 }
 
-/** Cartel de inicio/fin de fase que entra y sale con un fundido. */
-export function drawBanner(ctx, title, subtitle, progress) {
+/** Cartel de la fase actual según su estado (presentación o superada). */
+export function drawBanner(ctx, phases) {
+  if (phases.status === PHASE_STATUS.INTRO) {
+    drawBannerText(ctx, `FASE ${phases.number}: ${phases.phase.name.toUpperCase()}`, phases.phase.objective, phases.bannerProgress);
+  } else if (phases.status === PHASE_STATUS.CLEAR) {
+    const flawless = phases.lastClearFlawless;
+    const bonus = SCORE.PHASE_CLEAR + (flawless ? SCORE.NO_DAMAGE : 0);
+    drawBannerText(ctx, 'FASE SUPERADA', `+${bonus} puntos${flawless ? ' · ¡sin daño!' : ''}`, phases.bannerProgress);
+  }
+}
+
+/** Cartel que entra y sale con un fundido. */
+function drawBannerText(ctx, title, subtitle, progress) {
   const alpha = Math.min(1, progress * 5, (1 - progress) * 5);
   ctx.save();
   ctx.globalAlpha = alpha;

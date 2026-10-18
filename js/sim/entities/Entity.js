@@ -1,4 +1,4 @@
-import { CANVAS } from '../config.js';
+import { CANVAS } from '../../config.js';
 
 export class Entity {
   constructor(x, y, width, height) {
