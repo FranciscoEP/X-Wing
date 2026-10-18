@@ -77,3 +77,18 @@ kbd {
   font-family: inherit;
   font-size: 11px;
 }
+
+#mute-button {
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 232, 31, 0.5);
+  border-radius: 4px;
+  background: rgba(8, 12, 28, 0.8);
+  color: var(--yellow);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+#mute-button:hover {
+  background: rgba(255, 232, 31, 0.15);
+}

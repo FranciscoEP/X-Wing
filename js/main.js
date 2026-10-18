@@ -10,6 +10,19 @@ function startPhaseFromUrl() {
   return Number.isInteger(n) && n >= 1 && n <= PHASES.length ? n - 1 : 0;
 }
 
+function setupMuteButton(game) {
+  const button = document.getElementById('mute-button');
+  game.audio.onChange((muted) => {
+    button.textContent = muted ? '🔇 Sonido: no' : '🔊 Sonido: sí';
+    button.setAttribute('aria-pressed', String(muted));
+  });
+  button.addEventListener('click', () => {
+    game.toggleMute();
+    // Devolver el foco al canvas para que el teclado siga controlando la nave
+    document.getElementById('game').focus();
+  });
+}
+
 async function boot() {
   const canvas = document.getElementById('game');
   canvas.width = CANVAS.WIDTH;
@@ -23,10 +36,12 @@ async function boot() {
 
   const game = new Game(canvas, {
     images,
-    audio: new AudioManager(ASSETS.sounds),
+    // `?silencio` arranca sin audio (útil para pruebas)
+    audio: new AudioManager(ASSETS.sounds, { forceMute: new URLSearchParams(location.search).has('silencio') }),
     input: new Input(),
     startPhase: startPhaseFromUrl(),
   });
+  setupMuteButton(game);
   document.body.classList.add('ready');
   canvas.focus();
   game.start();

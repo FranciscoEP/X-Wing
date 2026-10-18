@@ -12,7 +12,7 @@ Shooter espacial en Canvas + JavaScript (ES modules, sin dependencias ni build).
 | Disparar | `J` o `Espacio` (mantener) |
 | Torpedo protón (limpia la pantalla) | `K` |
 | Pausa | `P` o `Esc` (`Q` en pausa vuelve al menú) |
-| Silenciar | `M` |
+| Silenciar | `M` o el botón «Sonido» bajo el juego |
 
 Power-ups que sueltan los enemigos: disparo triple, fuego rápido, escudo, reparación y torpedos extra. En la Estrella de la Muerte solo el **puerto de escape** (círculo amarillo) recibe daño; esquiva el superláser cuando veas la línea verde punteada.
 
@@ -24,7 +24,7 @@ Los ES modules no cargan desde `file://`, así que sirve la carpeta con cualquie
 python3 -m http.server 8000
 ```
 
-y abre http://localhost:8000.
+y abre http://localhost:8000. Parámetros útiles: `?silencio` arranca sin audio y `?fase=N` empieza en la fase N.
 
 ## Estructura
 

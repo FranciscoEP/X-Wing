@@ -84,7 +84,7 @@ export class Game {
 
   update(dt) {
     this.time += dt;
-    if (this.input.consume(KEYS.MUTE)) this.audio.toggleMute();
+    if (this.input.consume(KEYS.MUTE)) this.toggleMute();
 
     switch (this.state) {
       case STATE.MENU:
@@ -110,6 +110,11 @@ export class Game {
         if (this.input.consume(KEYS.CONFIRM)) this.toMenu();
         break;
     }
+  }
+
+  toggleMute() {
+    const inRun = this.state === STATE.PLAYING || this.state === STATE.PAUSED;
+    this.audio.toggleMute(inRun);
   }
 
   updateMenu() {

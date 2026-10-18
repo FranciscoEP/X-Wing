@@ -2,9 +2,10 @@ import { load, save } from './storage.js';
 
 /** Sonidos con polifonía simple (clona el nodo) y silencio global persistente. */
 export class AudioManager {
-  constructor(sounds) {
+  constructor(sounds, { forceMute = false } = {}) {
     this.sources = sounds;
-    this.muted = load('xwing.muted') === '1';
+    this.muted = forceMute || load('xwing.muted') === '1';
+    this.listeners = [];
     this.music = new Audio(sounds.music);
     this.music.loop = true;
     this.music.volume = 0.35;
@@ -31,11 +32,18 @@ export class AudioManager {
     this.music.currentTime = 0;
   }
 
-  toggleMute() {
+  onChange(listener) {
+    this.listeners.push(listener);
+    listener(this.muted);
+  }
+
+  /** `resumeMusic` indica si la música debe sonar al reactivar el audio (solo durante la partida). */
+  toggleMute(resumeMusic) {
     this.muted = !this.muted;
     save('xwing.muted', this.muted ? '1' : '0');
     if (this.muted) this.music.pause();
-    else this.music.play().catch(() => {});
+    else if (resumeMusic) this.music.play().catch(() => {});
+    this.listeners.forEach((fn) => fn(this.muted));
     return this.muted;
   }
 }
