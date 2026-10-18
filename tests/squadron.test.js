@@ -70,6 +70,7 @@ describe('IA: hostigamiento', () => {
   it('al acabar el hostigamiento se retira por la derecha y cuenta como escapado', () => {
     const world = arena();
     const e = holder(world);
+    e.returnsLeft = 0; // se prueba la retirada, no la vuelta
     run(world, 15, godMode, { until: () => e.dead });
     assert.ok(e.escaped && e.x > CANVAS.WIDTH, 'no se retiró por la derecha');
     assert.equal(emitted(world, 'enemyEscaped').length, 1);

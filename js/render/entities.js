@@ -54,6 +54,7 @@ export function drawHitbox(ctx, box) {
 }
 
 export function drawEnemy(ctx, enemy, sprites, time) {
+  if (enemy.returning > 0) return drawReturnWarning(ctx, enemy, time);
   const warning = enemy.movement.warning;
   if (warning) return drawPassWarning(ctx, warning, time);
   const cx = px(enemy.cx);
@@ -76,6 +77,17 @@ export function drawEnemy(ctx, enemy, sprites, time) {
       rect(ctx, x, cy + dy, 1, 1, PAL.white);
     }
   }
+}
+
+/** Un caza que da la vuelta: flecha roja en el borde derecho, a la altura por donde volverá. */
+function drawReturnWarning(ctx, enemy, time) {
+  const w = enemy.returnWarning;
+  if (!w || Math.floor(time * 10) % 2) return;
+  // Punta de flecha hacia la izquierda (hacia donde entrará) con su asta
+  const x = RENDER.WIDTH - 14;
+  const y = px(w.y);
+  for (let i = 0; i < 6; i++) rect(ctx, x + i, y - i, 1, i * 2 + 1, PAL.redHi);
+  rect(ctx, x + 6, y - 1, 6, 3, PAL.redHi);
 }
 
 /** Aviso de pasada del Interceptor: línea roja discontinua por la diagonal que va a cruzar. */

@@ -85,6 +85,7 @@ export const COMBAT = {
  * - dodge: probabilidad de esquivar (× la de cada caza)
  * - bossHp / bossPace: vida de los jefes y velocidad de todo su comportamiento (ataques incluidos)
  * - squadronPace / squadronBonus: frecuencia de escuadrones y naves extra en cada uno
+ * - enemyReturns: cuántas veces vuelve un caza que sale de la pantalla sin ser derribado
  * Se calibran con el piloto experto: `npm run balance` (metas en tests/balance.test.js).
  */
 export const DIFFICULTIES = {
@@ -102,6 +103,7 @@ export const DIFFICULTIES = {
     bossHp: 0.7,
     bossPace: 0.85,
     squadronPace: 0.85,
+    enemyReturns: 0,
     squadronBonus: 0,
   },
   NORMAL: {
@@ -118,6 +120,7 @@ export const DIFFICULTIES = {
     bossHp: 1.1,
     bossPace: 1.25,
     squadronPace: 1.25,
+    enemyReturns: 1,
     squadronBonus: 1,
   },
   HARD: {
@@ -134,6 +137,7 @@ export const DIFFICULTIES = {
     bossHp: 1.5,
     bossPace: 1.3,
     squadronPace: 1.35,
+    enemyReturns: 2,
     squadronBonus: 1,
   },
 };
@@ -144,8 +148,8 @@ export const DEFAULT_DIFFICULTY = 'NORMAL';
  * dodge.reaction: segundos de antelación con que detecta el láser. dodge.cooldown: pausa entre esquivas.
  */
 export const ENEMY_TYPES = {
-  TIE_FIGHTER: { hp: 20, speed: 140, fireRate: 0.5, score: 100, size: 56, wobble: 30, weapon: 'TWIN', dodge: { chance: 0.15, reaction: 0.3, speed: 220, cooldown: 1.5 } },
-  TIE_INTERCEPTOR: { hp: 30, speed: 220, fireRate: 0.8, score: 150, size: 50, wobble: 50, weapon: 'FAN', dodge: { chance: 0.55, reaction: 0.35, speed: 320, cooldown: 0.9 } },
+  TIE_FIGHTER: { hp: 20, speed: 140, fireRate: 0.5, score: 100, size: 56, wobble: 30, weapon: 'TWIN', returns: true, dodge: { chance: 0.15, reaction: 0.3, speed: 220, cooldown: 1.5 } },
+  TIE_INTERCEPTOR: { hp: 30, speed: 220, fireRate: 0.8, score: 150, size: 50, wobble: 50, weapon: 'FAN', returns: true, dodge: { chance: 0.55, reaction: 0.35, speed: 320, cooldown: 0.9 } },
   TIE_BOMBER: { hp: 60, speed: 70, fireRate: 0.45, score: 250, size: 62, wobble: 12, weapon: 'MINES', dodge: { chance: 0, reaction: 0, speed: 0, cooldown: 0 } },
   // Anclada a la pared de la trinchera: se desplaza con ella (sim/trench/Trench.js)
   TRENCH_TURRET: { hp: 20, speed: 180, fireRate: 0.45, score: 120, size: 40, wobble: 0, weapon: 'TRIO', dodge: { chance: 0, reaction: 0, speed: 0, cooldown: 0 } },
@@ -166,6 +170,12 @@ export const WEAPONS = {
 
 /** Mina del TIE Bomber: flota `lifetime` s y estalla; si te acercas, se arma con `fuse` s de margen. */
 export const MINE = { size: 22, hp: 10, lifetime: 4, drift: 30, proximity: 44, fuse: 0.35, radius: 90, damage: 25, score: 25 };
+
+/**
+ * Cazas que vuelven (ENEMY_TYPES.returns): al salir de la pantalla sin ser derribados dan la vuelta
+ * y regresan por la derecha tras `delay` s. Los últimos `warn` s una flecha marca por dónde entrarán.
+ */
+export const RETURN = { delay: 1.4, warn: 0.7, minY: 60, maxY: CANVAS.HEIGHT - 150 };
 
 /** Formaciones de escuadrón (ver sim/ai/formations.js). */
 export const FORMATION = { V: 'V', COLUMN: 'COLUMN', PINCER: 'PINCER', DIVE: 'DIVE', ECHELON: 'ECHELON', STRAFE: 'STRAFE', SLASH: 'SLASH' };

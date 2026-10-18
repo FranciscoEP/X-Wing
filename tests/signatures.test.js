@@ -87,6 +87,7 @@ describe('firma del Interceptor: pasada en diagonal con abanico', () => {
   it('cruza la pantalla rápido y se va (no se queda)', () => {
     const world = arena();
     const e = pass(world);
+    e.returnsLeft = 0; // aquí se prueba la pasada en sí, no la vuelta
     world.update(DT, {}); // fija la diagonal
     world.player.y = world.player.y > 270 ? 20 : 440; // el jugador se aparta de la diagonal
     const start = world.stats.time;

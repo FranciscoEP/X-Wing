@@ -1,8 +1,8 @@
-import { BULLET, CANVAS, ENEMY_TYPES } from '../../config.js';
+import { BULLET, CANVAS, ENEMY_TYPES, RETURN } from '../../config.js';
 import { rand } from '../../core/utils.js';
 import { interceptAngle } from '../ai/aim.js';
 import { Evasion } from '../ai/evasion.js';
-import { cruise, SPAWN_X } from '../ai/movement.js';
+import { cruise, slash, SPAWN_X } from '../ai/movement.js';
 import { createWeapon } from '../ai/weapons.js';
 import { Bullet } from './Bullet.js';
 import { Entity } from './Entity.js';
@@ -38,10 +38,24 @@ export class Enemy extends Entity {
     this.entered = false;
     this.escaped = false;
     this.squadron = null;
+    // Vueltas que le quedan si sale de la pantalla sin ser derribado (según tipo y dificultad)
+    this.returnsLeft = cfg.returns ? (difficulty.enemyReturns ?? 0) : 0;
+    this.returning = 0; // s hasta reaparecer (0 = en juego)
+    this.returnY = 0;
+  }
+
+  /** Último tramo de la vuelta: el renderer marca por dónde va a entrar. */
+  get returnWarning() {
+    return this.returning > 0 && this.returning <= RETURN.warn && this.cfg.weapon !== 'FAN' ? { y: this.returnY + this.height / 2 } : null;
   }
 
   update(dt, world) {
     this.hitFlash -= dt;
+    if (this.returning > 0) {
+      this.returning -= dt;
+      if (this.returning <= 0) this.reenter(world);
+      return;
+    }
     this.pathY = this.movement.update(this, dt, world);
     if (this.evasion.update(dt, this, world.playerBullets)) world.emit('enemyDodge', { enemy: this });
     this.evasion.clampTo(this.pathY, this.height);
@@ -54,9 +68,38 @@ export class Enemy extends Entity {
     // si no, una nave que nunca aparece bloquearía el fin de la oleada.
     const pastLeft = this.x + this.width < -ESCAPE_MARGIN;
     if (pastLeft || (this.entered && this.isOffScreen(ESCAPE_MARGIN))) {
-      this.dead = true;
-      this.escaped = true;
+      if (this.returnsLeft > 0) this.startReturn(world);
+      else {
+        this.dead = true;
+        this.escaped = true;
+      }
     }
+  }
+
+  /** Salió sin ser derribado: da la vuelta fuera de la pantalla y volverá a atacar. */
+  startReturn(world) {
+    this.returnsLeft--;
+    this.returning = RETURN.delay;
+    this.returnY = rand(RETURN.minY, RETURN.maxY);
+    this.x = CANVAS.WIDTH + 40;
+    this.y = this.pathY = this.returnY;
+    this.entered = false;
+    this.evasion.offset = 0;
+    this.evasion.velocity = 0;
+    world.emit('enemyReturn', { enemy: this });
+  }
+
+  /** Reaparece por la derecha con un ataque nuevo (el Interceptor, con otra pasada en diagonal). */
+  reenter(world) {
+    this.returning = 0;
+    this.x = SPAWN_X;
+    this.y = this.pathY = this.returnY;
+    this.movement =
+      this.cfg.weapon === 'FAN'
+        ? slash({ startX: CANVAS.WIDTH * rand(0.55, 0.9), fromTop: rand(0, 1) < 0.5 })
+        : cruise({ baseY: this.returnY, wobble: this.cfg.wobble });
+    this.weapon = createWeapon(this.cfg.weapon);
+    world.emit('enemyReentry', { enemy: this });
   }
 
   /** En pantalla, por delante del jugador y con el jugador vivo. */
