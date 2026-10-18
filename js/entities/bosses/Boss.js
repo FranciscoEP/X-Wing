@@ -1,240 +1,117 @@
-// ============================================
-// BOSS - Clase base para todos los jefes
-// ============================================
+import { BULLET, CANVAS } from '../../config.js';
+import { overlaps, rand } from '../../core/utils.js';
+import { Bullet } from '../Bullet.js';
+import { Entity } from '../Entity.js';
 
-class Boss {
-  constructor(x, y, type, config) {
-    this.x = x;
-    this.y = y;
-    this.type = type;
-    this.config = config;
-
-    // Stats
-    this.hp = config.hp;
-    this.maxHP = config.hp;
-    this.width = config.width;
-    this.height = config.height;
-    this.speed = config.speed || 1;
-
-    // Estado
-    this.active = true;
-    this.phase = 0;
-    this.shootTimer = 0;
-    this.shootDelay = config.shootDelay || 120;
-    this.moveTimer = 0;
-
-    // Patrón de movimiento
-    this.movePattern = config.movePattern || 'static';
-    this.moveData = {
-      direction: 1,
-      amplitude: 100,
-      frequency: 0.02,
-      offset: 0
-    };
-
-    // CSS Sprite (se inicializa en subclases)
-    this.cssSprite = null;
-    this.spriteId = `boss_${Date.now()}`;
-
-    // Puntos de disparo (se definen en subclases)
-    this.shootPoints = [];
+/**
+ * Base de los jefes: entrada desde la derecha, daño, secuencia de muerte y utilidades de disparo.
+ * Las subclases implementan `behave(dt, world)` y `drawBody(ctx, time)`.
+ */
+export class Boss extends Entity {
+  constructor({ name, hp, score, width, height, targetX, y }, difficulty) {
+    super(CANVAS.WIDTH + 40, y, width, height);
+    this.name = name;
+    this.maxHp = Math.round(hp * difficulty.bossHp);
+    this.hp = this.maxHp;
+    this.score = score;
+    this.targetX = targetX;
+    this.difficulty = difficulty;
+    this.entering = true;
+    this.dying = false;
+    this.deathTimer = 0;
+    this.hitFlash = 0;
+    this.age = 0;
+    this.baseFilter = '';
   }
 
-  update() {
-    if (!this.active) return;
+  get enraged() {
+    return this.hp < this.maxHp / 2;
+  }
 
-    // Actualizar movimiento
-    this.updateMovement();
+  get vulnerable() {
+    return !this.entering && !this.dying;
+  }
 
-    // Cooldown de disparo
-    if (this.shootTimer > 0) {
-      this.shootTimer--;
+  update(dt, world) {
+    this.age += dt;
+    this.hitFlash -= dt;
+
+    if (this.dying) {
+      this.deathTimer -= dt;
+      if (Math.random() < 0.5) {
+        world.particles.explosion(rand(this.x, this.x + this.width), rand(this.y, this.y + this.height), {
+          count: 14,
+        });
+      }
+      if (this.deathTimer <= 0) {
+        world.particles.explosion(this.cx, this.cy, { count: 120, speed: 420, size: 5 });
+        world.effects.flash('#fff', 0.6);
+        this.dead = true;
+      }
+      return;
     }
 
-    // Actualizar timer de movimiento
-    this.moveTimer++;
-
-    // Actualizar fase según HP
-    this.updatePhase();
-
-    // Actualizar sprite CSS si existe
-    if (this.cssSprite) {
-      this.updateCSSSprite();
+    if (this.entering) {
+      this.x -= 160 * dt;
+      if (this.x <= this.targetX) {
+        this.x = this.targetX;
+        this.entering = false;
+      }
+      return;
     }
+
+    this.behave(dt, world);
   }
 
-  updateMovement() {
-    switch(this.movePattern) {
-      case 'static':
-        // No se mueve
-        break;
+  behave() {}
 
-      case 'vertical':
-        // Movimiento vertical
-        this.y += this.speed * this.moveData.direction;
-        if (this.y > GAME_CONFIG.CANVAS_HEIGHT - this.height - 50 || this.y < 50) {
-          this.moveData.direction *= -1;
-        }
-        break;
-
-      case 'sine':
-        // Movimiento en onda sinusoidal
-        this.moveData.offset += this.moveData.frequency;
-        this.y = (GAME_CONFIG.CANVAS_HEIGHT / 2) +
-                 Math.sin(this.moveData.offset) * this.moveData.amplitude;
-        break;
-
-      case 'zigzag':
-        // Movimiento en zigzag
-        if (this.moveTimer % 60 === 0) {
-          this.moveData.direction *= -1;
-        }
-        this.y += this.speed * this.moveData.direction * 2;
-        this.y = Utils.clamp(this.y, 50, GAME_CONFIG.CANVAS_HEIGHT - this.height - 50);
-        break;
-
-      case 'circular':
-        // Movimiento circular
-        this.moveData.offset += this.moveData.frequency;
-        const centerX = GAME_CONFIG.CANVAS_WIDTH - 250;
-        const centerY = GAME_CONFIG.CANVAS_HEIGHT / 2;
-        this.x = centerX + Math.cos(this.moveData.offset) * 80;
-        this.y = centerY + Math.sin(this.moveData.offset) * 80;
-        break;
-    }
+  /** 'hit' si el proyectil daña, 'armor' si rebota, null si no toca. */
+  hitTest(bullet) {
+    return overlaps(bullet, this) ? 'hit' : null;
   }
 
-  updatePhase() {
-    const hpPercent = this.hp / this.maxHP;
-
-    if (hpPercent <= 0.3 && this.phase < 2) {
-      this.phase = 2;
-      this.onPhaseChange(2);
-    } else if (hpPercent <= 0.6 && this.phase < 1) {
-      this.phase = 1;
-      this.onPhaseChange(1);
-    }
-  }
-
-  onPhaseChange(newPhase) {
-    console.log(`Boss cambió a fase ${newPhase}`);
-    // Override en subclases
-  }
-
-  shoot() {
-    if (this.shootTimer > 0 || !this.active) return null;
-
-    this.shootTimer = this.shootDelay;
-
-    // Disparar desde todos los puntos de disparo
-    const bullets = [];
-    this.shootPoints.forEach(point => {
-      const bulletX = this.x + point.offsetX;
-      const bulletY = this.y + point.offsetY;
-
-      // Crear patrón de disparo según el tipo
-      const pattern = this.getShootPattern();
-      pattern.forEach(angle => {
-        const bullet = new EnemyBullet(bulletX, bulletY);
-
-        // Aplicar ángulo si no es 0
-        if (angle !== 0) {
-          const rad = Utils.degToRad(angle);
-          bullet.vx = Math.cos(rad + Math.PI) * bullet.speed;
-          bullet.vy = Math.sin(rad + Math.PI) * bullet.speed;
-          bullet.angle = angle;
-        }
-
-        bullets.push(bullet);
-      });
-    });
-
-    return bullets.length > 0 ? bullets : null;
-  }
-
-  getShootPattern() {
-    // Pattern básico - Override en subclases
-    return [0]; // Disparo recto
-  }
-
+  /** Devuelve true si el daño inició la secuencia de destrucción. */
   takeDamage(amount) {
-    if (!this.active) return false;
-
+    if (!this.vulnerable) return false;
     this.hp -= amount;
-
+    this.hitFlash = 0.06;
     if (this.hp <= 0) {
       this.hp = 0;
-      this.destroy();
-      return true; // Murió
+      this.dying = true;
+      this.deathTimer = 2.2;
+      return true;
     }
-
-    // Efecto visual de daño
-    this.onDamage();
-
     return false;
   }
 
-  onDamage() {
-    // Override en subclases para efectos visuales
-  }
-
-  destroy() {
-    this.active = false;
-    this.onDestroy();
-  }
-
-  onDestroy() {
-    // Limpiar sprite CSS
-    if (this.cssSprite) {
-      this.cssSprite.remove();
-      this.cssSprite = null;
+  fireSpread(world, x, y, angle, { count = 1, spread = 0, speed = BULLET.ENEMY_SPEED, color, size = 3 } = {}) {
+    const s = speed * Math.min(1.25, this.difficulty.enemyFire);
+    for (let i = 0; i < count; i++) {
+      const a = count === 1 ? angle : angle - spread / 2 + (spread * i) / (count - 1);
+      world.spawnBullet(
+        new Bullet(x, y, Math.cos(a) * s, Math.sin(a) * s, {
+          damage: BULLET.ENEMY_DAMAGE,
+          friendly: false,
+          color,
+          thickness: size,
+          length: 14 + size * 4,
+        })
+      );
     }
   }
 
-  draw(ctx) {
-    if (!this.active) return;
-
-    // Los jefes CSS no dibujan en canvas
-    // Se renderizan con CSS sprites
-
-    // Debug hitbox (opcional)
-    if (GAME_CONFIG.DEBUG_MODE) {
-      ctx.save();
-      ctx.strokeStyle = '#ff0000';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(this.x, this.y, this.width, this.height);
-      ctx.restore();
-    }
+  angleTo(target, x = this.x, y = this.cy) {
+    return Math.atan2(target.cy - y, target.cx - x);
   }
 
-  updateCSSSprite() {
-    // Actualizar posición del sprite CSS
-    if (this.cssSprite && this.cssSprite.element) {
-      this.cssSprite.setPosition(this.x, this.y);
-    }
+  draw(ctx, time) {
+    ctx.save();
+    const filter = `${this.baseFilter} ${this.hitFlash > 0 ? 'brightness(1.8)' : ''}`.trim();
+    if (filter) ctx.filter = filter;
+    if (this.dying) ctx.translate(rand(-3, 3), rand(-3, 3));
+    this.drawBody(ctx, time);
+    ctx.restore();
   }
 
-  isColliding(other) {
-    if (!this.active) return false;
-    return Utils.isColliding(this, other);
-  }
-
-  isOffScreen() {
-    return !this.active;
-  }
-
-  getHPPercent() {
-    return this.hp / this.maxHP;
-  }
-
-  // ==========================================
-  // HELPERS
-  // ==========================================
-
-  getDamageColor() {
-    const hpPercent = this.getHPPercent();
-    if (hpPercent > 0.6) return '#00ff00';
-    if (hpPercent > 0.3) return '#ffff00';
-    return '#ff0000';
-  }
+  drawBody() {}
 }

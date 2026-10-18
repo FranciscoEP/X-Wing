@@ -1,189 +1,48 @@
-// ============================================
-// HUD - Interfaz de usuario (vidas, HP, score)
-// ============================================
+import { CANVAS, PLAYER, POWERUPS } from '../config.js';
+import { bar, COLORS, panel, text } from './theme.js';
 
-class HUD {
-  constructor() {
-    this.padding = 10;
-    this.barWidth = 200;
-    this.barHeight = 20;
+export function drawHUD(ctx, game) {
+  const { player, phases, boss } = game;
+
+  // Casco: vida, vidas y torpedos
+  panel(ctx, 12, 12, 230, 62);
+  text(ctx, 'CASCO', 22, 32, { size: 11, color: COLORS.dim });
+  const hpRatio = player.hp / PLAYER.MAX_HP;
+  const hpColor = hpRatio > 0.5 ? COLORS.green : hpRatio > 0.25 ? COLORS.yellow : COLORS.red;
+  bar(ctx, 76, 22, 154, 12, hpRatio, hpColor);
+  text(ctx, 'VIDAS', 22, 58, { size: 11, color: COLORS.dim });
+  for (let i = 0; i < player.lives; i++) {
+    if (game.images.player) ctx.drawImage(game.images.player, 76 + i * 22, 45, 18, 17);
   }
+  text(ctx, `TORPEDOS ${player.bombs}`, 230, 58, { size: 11, color: COLORS.yellow, align: 'right' });
 
-  draw(ctx, player, score, phase) {
-    this.drawHealthBar(ctx, player);
-    this.drawLives(ctx, player);
-    this.drawScore(ctx, score);
-    this.drawPhaseInfo(ctx, phase);
-    this.drawActivePowerUps(ctx, player);
-  }
+  // Puntuación
+  panel(ctx, CANVAS.WIDTH - 202, 12, 190, 62);
+  text(ctx, String(game.score).padStart(7, '0'), CANVAS.WIDTH - 22, 40, { size: 22, color: COLORS.yellow, align: 'right' });
+  text(ctx, `RÉCORD ${game.highScore}`, CANVAS.WIDTH - 22, 62, { size: 11, color: COLORS.dim, align: 'right' });
 
-  drawHealthBar(ctx, player) {
-    const x = this.padding;
-    const y = this.padding;
-    const hpPercent = player.getHPPercent();
-
-    ctx.save();
-
-    // Fondo de la barra
-    ctx.fillStyle = '#333333';
-    ctx.fillRect(x, y, this.barWidth, this.barHeight);
-
-    // Barra de HP (color según porcentaje)
-    let hpColor = '#00ff00'; // Verde
-    if (hpPercent < 0.5) hpColor = '#ffff00'; // Amarillo
-    if (hpPercent < 0.25) hpColor = '#ff0000'; // Rojo
-
-    ctx.fillStyle = hpColor;
-    ctx.fillRect(x, y, this.barWidth * hpPercent, this.barHeight);
-
-    // Borde
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, this.barWidth, this.barHeight);
-
-    // Texto HP
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(
-      `HP: ${Math.ceil(player.hp)} / ${player.maxHP}`,
-      x + this.barWidth / 2,
-      y + this.barHeight / 2
-    );
-
-    ctx.restore();
-  }
-
-  drawLives(ctx, player) {
-    const x = this.padding;
-    const y = this.padding + this.barHeight + 10;
-
-    ctx.save();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 16px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText(`Vidas: ${player.lives}`, x, y);
-
-    // Dibujar iconos de vidas
-    for (let i = 0; i < player.lives; i++) {
-      ctx.fillStyle = '#00ff00';
-      ctx.beginPath();
-      ctx.arc(x + 70 + (i * 25), y - 5, 8, 0, Math.PI * 2);
-      ctx.fill();
+  // Fase / jefe
+  const phase = phases.phase;
+  if (phase) {
+    const cx = CANVAS.WIDTH / 2;
+    text(ctx, `FASE ${phases.number}/${phases.total} · ${phase.name.toUpperCase()}`, cx, 28, { size: 12, color: COLORS.dim, align: 'center' });
+    if (boss && !boss.entering) {
+      text(ctx, boss.name.toUpperCase(), cx, 48, { size: 12, color: COLORS.red, align: 'center' });
+      bar(ctx, cx - 160, 54, 320, 10, boss.hp / boss.maxHp, boss.enraged ? '#ff7a1a' : COLORS.red);
+    } else if (phase.type === 'WAVE' && phases.status === 'active') {
+      text(ctx, `${phases.resolved}/${phase.count}`, cx, 50, { size: 14, color: COLORS.text, align: 'center' });
     }
-
-    ctx.restore();
   }
 
-  drawScore(ctx, score) {
-    const x = GAME_CONFIG.CANVAS_WIDTH - this.padding;
-    const y = this.padding + 20;
+  // Power-ups activos
+  const active = Object.entries(player.powerUps);
+  active.forEach(([type, left], i) => {
+    const cfg = POWERUPS[type];
+    const y = CANVAS.HEIGHT - 30 - i * 26;
+    panel(ctx, 12, y - 6, 170, 22);
+    text(ctx, cfg.label, 20, y + 9, { size: 10, color: cfg.color });
+    bar(ctx, 120, y + 1, 54, 6, left / cfg.duration, cfg.color);
+  });
 
-    ctx.save();
-    ctx.fillStyle = '#ffff00';
-    ctx.font = 'bold 24px Arial';
-    ctx.textAlign = 'right';
-    ctx.fillText(`Score: ${Utils.formatNumber(score)}`, x, y);
-    ctx.restore();
-  }
-
-  drawPhaseInfo(ctx, phase) {
-    if (!phase) return;
-
-    const x = GAME_CONFIG.CANVAS_WIDTH - this.padding;
-    const y = this.padding + 50;
-
-    ctx.save();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '14px Arial';
-    ctx.textAlign = 'right';
-    ctx.fillText(`Fase ${phase.id}: ${phase.name}`, x, y);
-    ctx.fillText(phase.objective, x, y + 18);
-    ctx.restore();
-  }
-
-  drawActivePowerUps(ctx, player) {
-    if (player.activePowerUps.length === 0) return;
-
-    const x = this.padding;
-    const y = GAME_CONFIG.CANVAS_HEIGHT - 40;
-
-    ctx.save();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText('Power-Ups Activos:', x, y);
-
-    // Dibujar cada power-up activo
-    player.activePowerUps.forEach((powerUp, index) => {
-      const config = POWERUP_TYPES[powerUp.type];
-      const px = x + (index * 60);
-      const py = y + 10;
-
-      // Icono
-      ctx.fillStyle = config.color;
-      ctx.fillRect(px, py, 50, 15);
-
-      // Nombre abreviado
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '10px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(
-        config.name.substring(0, 8),
-        px + 25,
-        py + 10
-      );
-
-      // Tiempo restante
-      const timeLeft = Math.ceil(powerUp.timer / 60);
-      ctx.fillText(`${timeLeft}s`, px + 25, py + 22);
-    });
-
-    ctx.restore();
-  }
-
-  drawBossHealthBar(ctx, boss) {
-    if (!boss || !boss.active) return;
-
-    const x = GAME_CONFIG.CANVAS_WIDTH / 2 - 200;
-    const y = GAME_CONFIG.CANVAS_HEIGHT - 40;
-    const barWidth = 400;
-    const barHeight = 25;
-    const hpPercent = boss.hp / boss.maxHP;
-
-    ctx.save();
-
-    // Nombre del jefe
-    ctx.fillStyle = '#ff0000';
-    ctx.font = 'bold 16px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(boss.name || 'BOSS', x + barWidth / 2, y - 10);
-
-    // Fondo de la barra
-    ctx.fillStyle = '#330000';
-    ctx.fillRect(x, y, barWidth, barHeight);
-
-    // Barra de HP del jefe
-    ctx.fillStyle = '#ff0000';
-    ctx.fillRect(x, y, barWidth * hpPercent, barHeight);
-
-    // Borde
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(x, y, barWidth, barHeight);
-
-    // Texto HP
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 14px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(
-      `${Math.ceil(boss.hp)} / ${boss.maxHP}`,
-      x + barWidth / 2,
-      y + barHeight / 2
-    );
-
-    ctx.restore();
-  }
+  if (game.audio.muted) text(ctx, 'SILENCIO (M)', CANVAS.WIDTH - 12, CANVAS.HEIGHT - 12, { size: 10, color: COLORS.dim, align: 'right' });
 }

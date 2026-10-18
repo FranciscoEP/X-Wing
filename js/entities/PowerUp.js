@@ -1,130 +1,51 @@
-// ============================================
-// POWER-UP - Coleccionables del juego
-// ============================================
+import { POWERUPS } from '../config.js';
+import { Entity } from './Entity.js';
 
-class PowerUp {
-  constructor(x, y, type) {
-    this.x = x;
-    this.y = y;
-    this.width = 30;
-    this.height = 30;
+export class PowerUp extends Entity {
+  constructor(type, x, y) {
+    super(x - 14, y - 14, 28, 28);
     this.type = type;
-
-    // Obtener configuración del power-up
-    this.config = POWERUP_TYPES[type];
-
-    // Estado
-    this.active = true;
-    this.velY = 0;
-    this.floatOffset = 0;
-    this.floatSpeed = 0.1;
-
-    // Tiempo de vida (10 segundos)
-    this.lifetime = 600;
-    this.blinkTimer = 0;
+    this.cfg = POWERUPS[type];
+    this.age = 0;
+    this.lifetime = 10;
+    this.baseY = this.y;
   }
 
-  update() {
-    // Mover ligeramente hacia abajo
-    this.y += 0.5;
-
-    // Efecto de flotación
-    this.floatOffset += this.floatSpeed;
-
-    // Tiempo de vida
-    this.lifetime--;
-    if (this.lifetime <= 0) {
-      this.active = false;
-    }
-
-    // Parpadeo cuando está por expirar
-    if (this.lifetime < 120) {
-      this.blinkTimer++;
-    }
-
-    // Desactivar si sale de la pantalla
-    if (this.y > GAME_CONFIG.CANVAS_HEIGHT + 50) {
-      this.active = false;
-    }
+  update(dt) {
+    this.age += dt;
+    this.x -= 60 * dt;
+    this.y = this.baseY + Math.sin(this.age * 3) * 6;
+    if (this.age > this.lifetime || this.isOffScreen()) this.dead = true;
   }
 
   draw(ctx) {
-    if (!this.active) return;
-
-    // Parpadeo cuando está por expirar
-    if (this.blinkTimer > 0 && Math.floor(this.blinkTimer / 10) % 2 === 0) {
-      return;
-    }
-
-    const floatY = this.y + Math.sin(this.floatOffset) * 3;
+    // Parpadea durante los últimos 3 segundos
+    if (this.lifetime - this.age < 3 && Math.floor(this.age * 8) % 2 === 0) return;
+    const r = this.width / 2;
+    ctx.save();
+    ctx.translate(this.cx, this.cy);
+    ctx.shadowColor = this.cfg.color;
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = 'rgba(10, 14, 30, 0.85)';
+    ctx.strokeStyle = this.cfg.color;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.rotate(this.age * 2);
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
 
     ctx.save();
-
-    // Glow effect
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = this.config.color;
-
-    // Dibujar power-up como círculo con color
-    ctx.fillStyle = this.config.color;
-    ctx.beginPath();
-    ctx.arc(this.x + this.width / 2, floatY + this.height / 2, this.width / 2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Borde blanco
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Icono (primera letra del nombre)
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 16px Arial';
+    ctx.fillStyle = this.cfg.color;
+    ctx.font = 'bold 13px "Orbitron", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(
-      this.config.name[0],
-      this.x + this.width / 2,
-      floatY + this.height / 2
-    );
-
+    ctx.fillText(this.cfg.icon, this.cx, this.cy + 1);
     ctx.restore();
-  }
-
-  isColliding(other) {
-    if (!this.active) return false;
-    return Utils.isColliding(this, other);
-  }
-
-  collect() {
-    this.active = false;
-  }
-
-  isOffScreen() {
-    return !this.active || this.y > GAME_CONFIG.CANVAS_HEIGHT + 50;
-  }
-
-  // ==========================================
-  // STATIC: Spawn aleatorio de power-ups
-  // ==========================================
-
-  static spawnRandom(x, y, dropRate) {
-    // Decidir si hacer drop según la tasa
-    if (Math.random() > dropRate) {
-      return null;
-    }
-
-    // Seleccionar tipo de power-up según probabilidades
-    const roll = Math.random();
-    let cumulativeProbability = 0;
-
-    for (const [type, config] of Object.entries(POWERUP_TYPES)) {
-      cumulativeProbability += config.dropRate;
-
-      if (roll <= cumulativeProbability) {
-        return new PowerUp(x, y, type);
-      }
-    }
-
-    return null;
   }
 }

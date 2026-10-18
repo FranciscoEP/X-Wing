@@ -1,48 +1,35 @@
-// ============================================
-// BULLET - Proyectiles del jugador
-// ============================================
+import { Entity } from './Entity.js';
 
-class Bullet {
-  constructor(x, y) {
-    this.x = x;
-    this.y = y;
-    this.width = GAME_CONFIG.BULLET_WIDTH;
-    this.height = GAME_CONFIG.BULLET_HEIGHT;
-    this.speed = GAME_CONFIG.BULLET_SPEED;
-
-    // Sprite
-    this.img = new Image();
-    this.img.src = ASSETS.images.bullet1;
-
-    // Estado
-    this.active = true;
-    this.damage = GAME_CONFIG.BULLET_DAMAGE;
+/** Láser dibujado por código: rojo para la Alianza, verde para el Imperio. */
+export class Bullet extends Entity {
+  constructor(x, y, vx, vy, { damage, friendly, color, length = 22, thickness = 3 }) {
+    super(x - length / 2, y - thickness / 2, length, thickness);
+    this.vx = vx;
+    this.vy = vy;
+    this.damage = damage;
+    this.friendly = friendly;
+    this.color = color ?? (friendly ? '#ff3b3b' : '#4dff6a');
+    this.length = length;
+    this.thickness = thickness;
   }
 
-  update() {
-    this.x += this.speed;
-
-    // Desactivar si sale de la pantalla
-    if (this.x > GAME_CONFIG.CANVAS_WIDTH + 50) {
-      this.active = false;
-    }
+  update(dt) {
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    if (this.isOffScreen(40)) this.dead = true;
   }
 
   draw(ctx) {
-    if (!this.active) return;
-    ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
-  }
-
-  isOffScreen() {
-    return !this.active || this.x > GAME_CONFIG.CANVAS_WIDTH + 50;
-  }
-
-  isColliding(other) {
-    if (!this.active) return false;
-    return Utils.isColliding(this, other);
-  }
-
-  destroy() {
-    this.active = false;
+    const angle = Math.atan2(this.vy, this.vx);
+    ctx.save();
+    ctx.translate(this.cx, this.cy);
+    ctx.rotate(angle);
+    ctx.shadowColor = this.color;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = this.color;
+    ctx.fillRect(-this.length / 2, -this.thickness / 2, this.length, this.thickness);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(-this.length / 2 + 2, -this.thickness / 4, this.length - 4, this.thickness / 2);
+    ctx.restore();
   }
 }

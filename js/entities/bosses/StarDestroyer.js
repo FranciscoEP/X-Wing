@@ -1,333 +1,116 @@
-// ============================================
-// STAR DESTROYER - Jefe 2 (Imperial Capital Ship)
-// ============================================
+import { CANVAS } from '../../config.js';
+import { rand } from '../../core/utils.js';
+import { Boss } from './Boss.js';
 
-class StarDestroyer extends Boss {
-  constructor(x, y, spriteManager) {
-    const config = {
-      hp: 500,
-      width: 300,
-      height: 200,
-      speed: 0.5,
-      shootDelay: 60,
-      movePattern: 'vertical'
-    };
-
-    super(x, y, 'STAR_DESTROYER', config);
-
-    this.name = 'Imperial Star Destroyer';
-    this.spriteManager = spriteManager;
-
-    // Múltiples puntos de disparo (turbolásers)
-    this.shootPoints = [
-      { offsetX: 50, offsetY: 40 },   // Turret 1
-      { offsetX: 50, offsetY: 80 },   // Turret 2
-      { offsetX: 50, offsetY: 120 },  // Turret 3
-      { offsetX: 50, offsetY: 160 },  // Turret 4
-      { offsetX: 150, offsetY: 60 },  // Turret 5
-      { offsetX: 150, offsetY: 140 }  // Turret 6
+/** Destructor Estelar: casco triangular, torretas y hangar que lanza TIE Fighters. */
+export class StarDestroyer extends Boss {
+  constructor(difficulty) {
+    super(
+      { name: 'Destructor Estelar clase Imperial', hp: 1200, score: 6000, width: 400, height: 190, targetX: CANVAS.WIDTH - 420, y: CANVAS.HEIGHT / 2 - 95 },
+      difficulty
+    );
+    this.turretTimer = 1.5;
+    this.broadsideTimer = 4;
+    this.hangarTimer = 3;
+    // Torretas relativas al casco (proporciones 0..1)
+    this.turrets = [
+      { u: 0.45, v: 0.5 },
+      { u: 0.7, v: 0.32 },
+      { u: 0.7, v: 0.68 },
     ];
-
-    // TIE Fighter spawning
-    this.spawnTimer = 0;
-    this.spawnDelay = 180; // Cada 3 segundos
-    this.canSpawnTIEs = false;
-
-    // Crear sprite CSS
-    this.createCSSSprite();
   }
 
-  createCSSSprite() {
-    this.cssSprite = this.spriteManager.createSprite(this.spriteId, 'div', 'star-destroyer');
+  behave(dt, world) {
+    this.y = CANVAS.HEIGHT / 2 - this.height / 2 + Math.sin(this.age * 0.5) * 90;
 
-    this.cssSprite.setStyles({
-      width: this.width + 'px',
-      height: this.height + 'px',
-      position: 'absolute',
-      left: this.x + 'px',
-      top: this.y + 'px'
-    });
-
-    const el = this.cssSprite.element;
-
-    // Cuerpo principal (forma de daga)
-    const body = document.createElement('div');
-    body.className = 'destroyer-body';
-    body.style.cssText = `
-      width: 0;
-      height: 0;
-      border-left: 150px solid transparent;
-      border-right: 150px solid transparent;
-      border-bottom: 200px solid #555;
-      position: absolute;
-      left: 0;
-      top: 0;
-      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
-    `;
-    el.appendChild(body);
-
-    // Torre de comando
-    const tower = document.createElement('div');
-    tower.className = 'command-tower';
-    tower.style.cssText = `
-      width: 40px;
-      height: 80px;
-      background: linear-gradient(90deg, #444 0%, #666 50%, #444 100%);
-      border: 2px solid #333;
-      border-radius: 3px;
-      position: absolute;
-      left: 130px;
-      top: 160px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
-    `;
-    el.appendChild(tower);
-
-    // Ventanas de la torre
-    for (let i = 0; i < 4; i++) {
-      const window = document.createElement('div');
-      window.style.cssText = `
-        width: 8px;
-        height: 6px;
-        background: #ffcc00;
-        position: absolute;
-        left: ${8 + (i * 6)}px;
-        top: ${20 + (i * 12)}px;
-        box-shadow: 0 0 3px #ffcc00;
-      `;
-      tower.appendChild(window);
+    this.turretTimer -= dt;
+    if (this.turretTimer <= 0) {
+      this.turretTimer = this.enraged ? 0.55 : 0.9;
+      const t = this.turrets[Math.floor(rand(0, this.turrets.length))];
+      const tx = this.x + t.u * this.width;
+      const ty = this.y + t.v * this.height;
+      this.fireSpread(world, tx, ty, this.angleTo(world.player, tx, ty), { count: this.enraged ? 3 : 1, spread: 0.25 });
     }
 
-    // Motores (glow azul)
-    const engines = document.createElement('div');
-    engines.className = 'engines';
-    engines.style.cssText = `
-      width: 100px;
-      height: 20px;
-      background: radial-gradient(ellipse, #4da6ff 0%, #0066cc 50%, transparent 80%);
-      position: absolute;
-      left: 100px;
-      bottom: 5px;
-      animation: enginePulse 1s ease-in-out infinite;
-      box-shadow: 0 0 20px #4da6ff;
-    `;
-    el.appendChild(engines);
-
-    // Ventanas del casco (grid pattern)
-    this.addWindows(body);
-
-    // Turrets (puntos de disparo visuales)
-    this.addTurrets(el);
-
-    // Agregar animaciones
-    this.addAnimationStyles();
-  }
-
-  addWindows(body) {
-    // Agregar ventanas pequeñas al casco
-    const windowsContainer = document.createElement('div');
-    windowsContainer.style.cssText = `
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      top: 0;
-      left: 0;
-    `;
-
-    for (let row = 0; row < 5; row++) {
-      for (let col = 0; col < 8; col++) {
-        const window = document.createElement('div');
-        window.style.cssText = `
-          width: 3px;
-          height: 3px;
-          background: rgba(255, 204, 0, 0.6);
-          position: absolute;
-          left: ${60 + col * 20}px;
-          top: ${30 + row * 25}px;
-          box-shadow: 0 0 2px rgba(255, 204, 0, 0.8);
-        `;
-        windowsContainer.appendChild(window);
-      }
+    this.broadsideTimer -= dt;
+    if (this.broadsideTimer <= 0) {
+      this.broadsideTimer = this.enraged ? 3 : 4.5;
+      this.fireSpread(world, this.x + 10, this.cy, Math.PI, { count: 11, spread: 1.6, speed: 260, size: 4, color: '#7dff8f' });
     }
 
-    body.appendChild(windowsContainer);
-  }
-
-  addTurrets(el) {
-    // Agregar torretas visuales
-    this.shootPoints.forEach((point, index) => {
-      const turret = document.createElement('div');
-      turret.className = `turret turret-${index}`;
-      turret.style.cssText = `
-        width: 12px;
-        height: 12px;
-        background: #888;
-        border: 2px solid #444;
-        border-radius: 50%;
-        position: absolute;
-        left: ${point.offsetX}px;
-        top: ${point.offsetY}px;
-        box-shadow: 0 0 5px rgba(255, 100, 0, 0.5);
-      `;
-      el.appendChild(turret);
-    });
-  }
-
-  addAnimationStyles() {
-    if (!document.getElementById('star-destroyer-animations')) {
-      const style = document.createElement('style');
-      style.id = 'star-destroyer-animations';
-      style.textContent = `
-        @keyframes enginePulse {
-          0%, 100% {
-            opacity: 0.8;
-            box-shadow: 0 0 20px #4da6ff;
-          }
-          50% {
-            opacity: 1;
-            box-shadow: 0 0 30px #4da6ff;
-          }
-        }
-
-        @keyframes turretFire {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.3); }
-        }
-
-        .star-destroyer.damaged {
-          animation: damage-shake 0.2s;
-        }
-
-        @keyframes damage-shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-
-        .star-destroyer.phase-2 .destroyer-body {
-          border-bottom-color: #ff6600;
-        }
-
-        .star-destroyer.phase-3 .destroyer-body {
-          border-bottom-color: #ff0000;
-        }
-      `;
-      document.head.appendChild(style);
+    this.hangarTimer -= dt;
+    if (this.hangarTimer <= 0) {
+      this.hangarTimer = this.enraged ? 2.5 : 4;
+      world.spawnEnemy('TIE_FIGHTER', this.cy + rand(-40, 40));
     }
   }
 
-  update() {
-    super.update();
+  /** Solo el triángulo del casco recibe impactos (no la caja completa). */
+  hitTest(bullet) {
+    const px = bullet.cx;
+    const py = bullet.cy;
+    if (px < this.x || px > this.x + this.width) return null;
+    const halfSpan = ((px - this.x) / this.width) * (this.height / 2);
+    return Math.abs(py - this.cy) <= halfSpan ? 'hit' : null;
+  }
 
-    if (!this.active) return;
+  drawBody(ctx, time) {
+    const { x, y, width: w, height: h } = this;
+    const grad = ctx.createLinearGradient(x, y, x, y + h);
+    grad.addColorStop(0, '#c9ced6');
+    grad.addColorStop(0.5, '#8a929e');
+    grad.addColorStop(1, '#4b525c');
 
-    // TIE Fighter spawning logic
-    if (this.canSpawnTIEs) {
-      this.spawnTimer++;
+    // Casco
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = '#2b3038';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y + h / 2);
+    ctx.lineTo(x + w, y);
+    ctx.lineTo(x + w, y + h);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Línea central y paneles
+    ctx.strokeStyle = 'rgba(40, 45, 55, 0.7)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + 10, y + h / 2);
+    ctx.lineTo(x + w, y + h / 2);
+    for (let i = 1; i < 6; i++) {
+      const px = x + (w * i) / 6;
+      const span = (i / 6) * (h / 2);
+      ctx.moveTo(px, y + h / 2 - span);
+      ctx.lineTo(px, y + h / 2 + span);
     }
-  }
+    ctx.stroke();
 
-  shoot() {
-    if (this.shootTimer > 0 || !this.active) return null;
+    // Torre de mando
+    ctx.fillStyle = '#9aa1ab';
+    ctx.fillRect(x + w * 0.78, y + h / 2 - 22, 50, 44);
+    ctx.fillStyle = '#6b727c';
+    ctx.fillRect(x + w * 0.84, y + h / 2 - 36, 26, 72);
 
-    this.shootTimer = this.shootDelay;
-
-    const bullets = [];
-
-    // En fase 1, solo algunos turrets disparan
-    const activePoints = this.phase === 0 ?
-      [this.shootPoints[0], this.shootPoints[2], this.shootPoints[4]] :
-      this.shootPoints;
-
-    activePoints.forEach((point, index) => {
-      const bulletX = this.x + point.offsetX;
-      const bulletY = this.y + point.offsetY;
-
-      const bullet = new EnemyBullet(bulletX, bulletY);
-      bullets.push(bullet);
-
-      // Animación de disparo en la torreta
-      this.animateTurretFire(index);
-    });
-
-    return bullets.length > 0 ? bullets : null;
-  }
-
-  animateTurretFire(turretIndex) {
-    const turret = this.cssSprite.element.querySelector(`.turret-${turretIndex}`);
-    if (turret) {
-      turret.style.animation = 'turretFire 0.2s';
-      turret.style.boxShadow = '0 0 10px rgba(255, 100, 0, 1)';
-
-      setTimeout(() => {
-        if (turret) {
-          turret.style.animation = '';
-          turret.style.boxShadow = '0 0 5px rgba(255, 100, 0, 0.5)';
-        }
-      }, 200);
+    // Motores
+    const glow = 0.6 + Math.sin(time * 10) * 0.2;
+    ctx.fillStyle = `rgba(120, 190, 255, ${glow})`;
+    ctx.shadowColor = '#78beff';
+    ctx.shadowBlur = 20;
+    for (const v of [0.25, 0.5, 0.75]) {
+      ctx.beginPath();
+      ctx.arc(x + w + 4, y + v * h, 9, 0, Math.PI * 2);
+      ctx.fill();
     }
-  }
+    ctx.shadowBlur = 0;
 
-  shouldSpawnTIE() {
-    if (!this.canSpawnTIEs || !this.active) return false;
-
-    if (this.spawnTimer >= this.spawnDelay) {
-      this.spawnTimer = 0;
-      return true;
-    }
-
-    return false;
-  }
-
-  getShootPattern() {
-    return [0]; // Disparo directo desde cada turret
-  }
-
-  onPhaseChange(newPhase) {
-    super.onPhaseChange(newPhase);
-
-    console.log(`Star Destroyer: Fase ${newPhase + 1}`);
-
-    if (newPhase === 1) {
-      // Fase 2: Activar spawn de TIEs
-      this.canSpawnTIEs = true;
-      this.shootDelay = 45; // Disparo más rápido
-      this.cssSprite.addClass('phase-2');
-    } else if (newPhase === 2) {
-      // Fase 3: RAGE MODE
-      this.shootDelay = 30; // Disparo muy rápido
-      this.spawnDelay = 120; // Spawn más frecuente
-      this.cssSprite.addClass('phase-3');
-    }
-  }
-
-  onDamage() {
-    super.onDamage();
-
-    if (this.cssSprite && this.cssSprite.element) {
-      this.cssSprite.addClass('damaged');
-      setTimeout(() => {
-        if (this.cssSprite && this.cssSprite.element) {
-          this.cssSprite.removeClass('damaged');
-        }
-      }, 200);
-    }
-  }
-
-  onDestroy() {
-    super.onDestroy();
-
-    // Explosión épica
-    if (this.cssSprite && this.cssSprite.element) {
-      this.cssSprite.element.style.transition = 'all 1s';
-      this.cssSprite.element.style.opacity = '0';
-      this.cssSprite.element.style.transform = 'scale(1.3) rotate(-15deg)';
-      this.cssSprite.element.style.filter = 'brightness(3)';
-
-      setTimeout(() => {
-        if (this.spriteManager) {
-          this.spriteManager.removeSprite(this.spriteId);
-        }
-      }, 1000);
+    // Torretas
+    ctx.fillStyle = '#ff5050';
+    for (const t of this.turrets) {
+      ctx.beginPath();
+      ctx.arc(x + t.u * w, y + t.v * h, 4, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 }

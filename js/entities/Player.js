@@ -1,283 +1,147 @@
-// ============================================
-// PLAYER - Jugador único (X-Wing)
-// ============================================
+import { BULLET, CANVAS, KEYS, PLAYER } from '../config.js';
+import { clamp } from '../core/utils.js';
+import { Bullet } from './Bullet.js';
+import { Entity } from './Entity.js';
 
-class Player {
-  constructor(x, y, sprite) {
-    this.x = x;
-    this.y = y;
-    this.width = GAME_CONFIG.PLAYER_WIDTH;
-    this.height = GAME_CONFIG.PLAYER_HEIGHT;
-
-    // Sprite
-    this.img = new Image();
-    this.img.src = sprite;
-
-    // Stats
-    this.hp = GAME_CONFIG.PLAYER_MAX_HP;
-    this.maxHP = GAME_CONFIG.PLAYER_MAX_HP;
-    this.lives = 3; // Se configurará desde GameManager
-    this.speed = GAME_CONFIG.PLAYER_SPEED;
-
-    // Física
-    this.velX = 0;
-    this.velY = 0;
-    this.friction = GAME_CONFIG.FRICTION;
-
-    // Power-ups activos
-    this.activePowerUps = [];
-
-    // Estado
-    this.isInvulnerable = false;
-    this.invulnerabilityTimer = 0;
-    this.isDead = false;
-
-    // Disparo
-    this.shootCooldown = 0;
-    this.shootDelay = 10; // frames entre disparos
+export class Player extends Entity {
+  constructor(sprite, lives) {
+    super(0, 0, PLAYER.WIDTH, PLAYER.HEIGHT);
+    this.sprite = sprite;
+    this.lives = lives;
+    this.bombs = PLAYER.START_BOMBS;
+    this.powerUps = {}; // tipo -> segundos restantes
+    this.reset();
   }
 
-  update(keys) {
-    if (this.isDead) return;
-
-    // Movimiento con WASD
-    if (keys[GAME_CONFIG.KEYS.RIGHT]) { // D
-      if (this.velX < this.speed) {
-        this.velX++;
-      }
-    }
-    if (keys[GAME_CONFIG.KEYS.LEFT]) { // A
-      if (this.velX > -this.speed) {
-        this.velX--;
-      }
-    }
-    if (keys[GAME_CONFIG.KEYS.DOWN]) { // S
-      if (this.velY < this.speed) {
-        this.velY++;
-      }
-    }
-    if (keys[GAME_CONFIG.KEYS.UP]) { // W
-      if (this.velY > -this.speed) {
-        this.velY--;
-      }
-    }
-
-    // Aplicar fricción
-    this.velX *= this.friction;
-    this.velY *= this.friction;
-
-    // Actualizar posición
-    this.x += this.velX;
-    this.y += this.velY;
-
-    // Límites del canvas
-    this.applyBoundaries();
-
-    // Cooldown de disparo
-    if (this.shootCooldown > 0) {
-      this.shootCooldown--;
-    }
-
-    // Invulnerabilidad temporal
-    if (this.isInvulnerable) {
-      this.invulnerabilityTimer--;
-      if (this.invulnerabilityTimer <= 0) {
-        this.isInvulnerable = false;
-      }
-    }
-
-    // Actualizar power-ups activos
-    this.updatePowerUps();
+  /** Coloca la nave en la posición inicial con la vida completa. */
+  reset() {
+    this.x = 80;
+    this.y = CANVAS.HEIGHT / 2 - this.height / 2;
+    this.vx = 0;
+    this.vy = 0;
+    this.hp = PLAYER.MAX_HP;
+    this.fireTimer = 0;
+    this.invulnerable = PLAYER.RESPAWN_INVULNERABILITY;
+    this.dead = false;
+    this.tilt = 0;
   }
 
-  draw(ctx) {
-    if (this.isDead) return;
-
-    // Parpadeo si es invulnerable
-    if (this.isInvulnerable && Math.floor(this.invulnerabilityTimer / 5) % 2 === 0) {
-      return; // No dibujar (efecto parpadeo)
-    }
-
-    ctx.save();
-
-    // Efecto de glow si tiene power-ups activos
-    if (this.activePowerUps.length > 0) {
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = this.getPowerUpGlowColor();
-    }
-
-    ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
-    ctx.restore();
+  get shielded() {
+    return (this.powerUps.SHIELD ?? 0) > 0;
   }
 
-  applyBoundaries() {
-    const margin = GAME_CONFIG.BOUNDARY_MARGIN;
-    const maxX = GAME_CONFIG.CANVAS_WIDTH - this.width - margin;
-    const maxY = GAME_CONFIG.CANVAS_HEIGHT - this.height - margin;
+  get canBeHit() {
+    return !this.dead && this.invulnerable <= 0 && !this.shielded;
+  }
 
-    if (this.x > maxX) {
-      this.x = maxX;
-      this.velX = 0;
-    } else if (this.x < margin) {
-      this.x = margin;
-      this.velX = 0;
-    }
+  update(dt, input) {
+    if (this.dead) return;
 
-    if (this.y > maxY) {
-      this.y = maxY;
-      this.velY = 0;
-    } else if (this.y < margin) {
-      this.y = margin;
-      this.velY = 0;
+    const ax = (input.isDown(KEYS.RIGHT) ? 1 : 0) - (input.isDown(KEYS.LEFT) ? 1 : 0);
+    const ay = (input.isDown(KEYS.DOWN) ? 1 : 0) - (input.isDown(KEYS.UP) ? 1 : 0);
+    // Normalizar diagonales para que no sean más rápidas.
+    const norm = ax && ay ? Math.SQRT1_2 : 1;
+
+    this.vx += ax * norm * PLAYER.ACCEL * dt;
+    this.vy += ay * norm * PLAYER.ACCEL * dt;
+    const damping = Math.exp(-PLAYER.FRICTION * dt);
+    this.vx = clamp(this.vx * damping, -PLAYER.MAX_SPEED, PLAYER.MAX_SPEED);
+    this.vy = clamp(this.vy * damping, -PLAYER.MAX_SPEED, PLAYER.MAX_SPEED);
+
+    this.x = clamp(this.x + this.vx * dt, 8, CANVAS.WIDTH * 0.75 - this.width);
+    this.y = clamp(this.y + this.vy * dt, 8, CANVAS.HEIGHT - this.height - 8);
+    this.tilt = this.vy / PLAYER.MAX_SPEED;
+
+    this.fireTimer -= dt;
+    this.invulnerable -= dt;
+    for (const type of Object.keys(this.powerUps)) {
+      this.powerUps[type] -= dt;
+      if (this.powerUps[type] <= 0) delete this.powerUps[type];
     }
   }
 
-  shoot() {
-    if (this.shootCooldown > 0 || this.isDead) return null;
+  /** Devuelve las balas disparadas este frame (o una lista vacía si está en cooldown). */
+  tryShoot() {
+    if (this.dead || this.fireTimer > 0) return [];
+    const rapid = this.powerUps.RAPID_FIRE > 0;
+    this.fireTimer = PLAYER.FIRE_COOLDOWN * (rapid ? 0.5 : 1);
 
-    this.shootCooldown = this.shootDelay;
-
-    // Retornar array de balas según power-ups activos
-    const bullets = [];
-    const bulletType = this.getCurrentBulletType();
-
-    switch(bulletType) {
-      case 'DUAL_SHOT':
-        bullets.push(new Bullet(this.x + this.width, this.y + 20));
-        bullets.push(new Bullet(this.x + this.width, this.y + this.height - 30));
-        break;
-
-      case 'QUAD_SHOT':
-        bullets.push(new Bullet(this.x + this.width, this.y + 10));
-        bullets.push(new Bullet(this.x + this.width, this.y + 30));
-        bullets.push(new Bullet(this.x + this.width, this.y + this.height - 40));
-        bullets.push(new Bullet(this.x + this.width, this.y + this.height - 20));
-        break;
-
-      default: // Normal shot
-        bullets.push(new Bullet(this.x + this.width, this.y + 20));
-        bullets.push(new Bullet(this.x + this.width, this.y + this.height - 30));
-        break;
+    const opts = { damage: BULLET.PLAYER_DAMAGE, friendly: true };
+    const nose = this.x + this.width;
+    const shots = [
+      new Bullet(nose - 20, this.y + 6, BULLET.PLAYER_SPEED, 0, opts),
+      new Bullet(nose - 20, this.y + this.height - 6, BULLET.PLAYER_SPEED, 0, opts),
+    ];
+    if (this.powerUps.TRIPLE_SHOT > 0) {
+      shots.push(new Bullet(nose, this.cy, BULLET.PLAYER_SPEED, 0, opts));
+      shots.push(new Bullet(nose, this.cy, BULLET.PLAYER_SPEED * 0.96, -BULLET.PLAYER_SPEED * 0.22, opts));
+      shots.push(new Bullet(nose, this.cy, BULLET.PLAYER_SPEED * 0.96, BULLET.PLAYER_SPEED * 0.22, opts));
     }
-
-    return bullets;
+    return shots;
   }
 
-  getCurrentBulletType() {
-    // Verificar power-ups activos
-    if (this.hasPowerUp('QUAD_SHOT')) return 'QUAD_SHOT';
-    if (this.hasPowerUp('DUAL_SHOT')) return 'DUAL_SHOT';
-    return 'NORMAL';
-  }
-
+  /** Aplica daño; devuelve true si la nave fue destruida. */
   takeDamage(amount) {
-    if (this.isInvulnerable || this.isDead) return false;
-
+    if (!this.canBeHit) return false;
     this.hp -= amount;
-
     if (this.hp <= 0) {
       this.hp = 0;
-      this.die();
+      this.dead = true;
+      this.lives--;
       return true;
     }
-
-    // Invulnerabilidad temporal al recibir daño
-    this.isInvulnerable = true;
-    this.invulnerabilityTimer = 60; // 1 segundo a 60 FPS
-
+    this.invulnerable = PLAYER.HIT_INVULNERABILITY;
     return false;
   }
 
   heal(amount) {
-    this.hp = Math.min(this.hp + amount, this.maxHP);
+    this.hp = Math.min(PLAYER.MAX_HP, this.hp + amount);
   }
 
-  die() {
-    this.isDead = true;
-    this.lives--;
-  }
+  draw(ctx, time) {
+    if (this.dead) return;
+    if (this.invulnerable > 0 && Math.floor(time * 12) % 2 === 0) return;
 
-  respawn() {
-    if (this.lives <= 0) return false;
+    ctx.save();
+    ctx.translate(this.cx, this.cy);
+    ctx.rotate(this.tilt * 0.15);
 
-    this.hp = this.maxHP;
-    this.isDead = false;
-    this.x = 200;
-    this.y = GAME_CONFIG.CANVAS_HEIGHT / 2 - this.height / 2;
-    this.velX = 0;
-    this.velY = 0;
+    // Brillo de los motores
+    const flicker = 0.7 + Math.random() * 0.3;
+    ctx.fillStyle = `rgba(255, 140, 60, ${0.6 * flicker})`;
+    ctx.shadowColor = '#ff8c3c';
+    ctx.shadowBlur = 14;
+    for (const dy of [-12, 12]) {
+      ctx.beginPath();
+      ctx.ellipse(-this.width / 2 - 2, dy, 8 * flicker, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
 
-    // Invulnerabilidad al respawnear
-    this.isInvulnerable = true;
-    this.invulnerabilityTimer = 120; // 2 segundos
-
-    return true;
-  }
-
-  // ==========================================
-  // POWER-UPS
-  // ==========================================
-
-  addPowerUp(type, duration) {
-    // Verificar si ya tiene este power-up
-    const existing = this.activePowerUps.find(p => p.type === type);
-
-    if (existing) {
-      // Extender duración
-      existing.timer = duration;
+    if (this.sprite) {
+      ctx.drawImage(this.sprite, -this.width / 2, -this.height / 2, this.width, this.height);
     } else {
-      // Agregar nuevo
-      this.activePowerUps.push({
-        type: type,
-        timer: duration
-      });
+      ctx.fillStyle = '#ddd';
+      ctx.beginPath();
+      ctx.moveTo(this.width / 2, 0);
+      ctx.lineTo(-this.width / 2, -this.height / 2);
+      ctx.lineTo(-this.width / 2, this.height / 2);
+      ctx.fill();
     }
 
-    console.log(`Power-up activado: ${type}`);
-  }
-
-  hasPowerUp(type) {
-    return this.activePowerUps.some(p => p.type === type);
-  }
-
-  updatePowerUps() {
-    // Decrementar timers y eliminar expirados
-    for (let i = this.activePowerUps.length - 1; i >= 0; i--) {
-      this.activePowerUps[i].timer--;
-
-      if (this.activePowerUps[i].timer <= 0) {
-        console.log(`Power-up expirado: ${this.activePowerUps[i].type}`);
-        this.activePowerUps.splice(i, 1);
-      }
+    if (this.shielded) {
+      const left = this.powerUps.SHIELD;
+      ctx.globalAlpha = left < 1.5 ? 0.3 + 0.3 * Math.sin(time * 20) : 0.45;
+      ctx.strokeStyle = '#22d3ee';
+      ctx.fillStyle = 'rgba(34, 211, 238, 0.12)';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#22d3ee';
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.width * 0.68, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     }
-  }
-
-  getPowerUpGlowColor() {
-    if (this.activePowerUps.length === 0) return '#ffffff';
-
-    // Retornar color del primer power-up activo
-    const type = this.activePowerUps[0].type;
-    const powerUp = POWERUP_TYPES[type];
-    return powerUp ? powerUp.color : '#ffffff';
-  }
-
-  // ==========================================
-  // COLISIÓN
-  // ==========================================
-
-  isColliding(other) {
-    return Utils.isColliding(this, other);
-  }
-
-  // ==========================================
-  // GETTERS
-  // ==========================================
-
-  getHPPercent() {
-    return this.hp / this.maxHP;
-  }
-
-  isAlive() {
-    return !this.isDead && this.lives > 0;
+    ctx.restore();
   }
 }

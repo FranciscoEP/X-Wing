@@ -1,89 +1,80 @@
-// ============================================
-// ENEMY - TIE Fighter básico
-// ============================================
+import { BULLET, CANVAS, ENEMY_TYPES } from '../config.js';
+import { rand } from '../core/utils.js';
+import { Bullet } from './Bullet.js';
+import { Entity } from './Entity.js';
 
-class Enemy {
-  constructor(x, y, type = 'TIE_FIGHTER') {
-    this.x = x;
-    this.y = y;
-    this.width = GAME_CONFIG.ENEMY_WIDTH;
-    this.height = GAME_CONFIG.ENEMY_HEIGHT;
+export class Enemy extends Entity {
+  constructor(type, sprite, difficulty, y = rand(40, CANVAS.HEIGHT - 100)) {
+    const cfg = ENEMY_TYPES[type];
+    super(CANVAS.WIDTH + 10, y, cfg.size, cfg.size * 0.8);
     this.type = type;
-
-    // Sprite
-    this.img = new Image();
-    this.img.src = ASSETS.images.enemy;
-
-    // Stats según tipo
-    this.speed = GAME_CONFIG.ENEMY_SPEED;
-    this.hp = 10;
-    this.scoreValue = SCORE_VALUES.TIE_FIGHTER;
-
-    if (type === 'TIE_INTERCEPTOR') {
-      this.speed = GAME_CONFIG.ENEMY_SPEED * 1.5;
-      this.hp = 15;
-      this.scoreValue = SCORE_VALUES.TIE_INTERCEPTOR;
-    }
-
-    // Estado
-    this.active = true;
-    this.shootTimer = 0;
-    this.shootDelay = 90; // frames entre disparos
+    this.cfg = cfg;
+    this.sprite = sprite;
+    this.hp = cfg.hp;
+    this.score = cfg.score;
+    this.speed = cfg.speed * difficulty.enemySpeed;
+    this.fireRate = cfg.fireRate * difficulty.enemyFire;
+    this.baseY = y;
+    this.age = rand(0, Math.PI * 2);
+    this.fireTimer = rand(0.6, 1.6);
+    this.hitFlash = 0;
+    this.escaped = false;
   }
 
-  update() {
-    // Mover hacia la izquierda
-    this.x -= this.speed;
+  update(dt, world) {
+    this.age += dt;
+    this.x -= this.speed * dt;
+    this.y = this.baseY + Math.sin(this.age * 2) * this.cfg.wobble;
+    this.hitFlash -= dt;
 
-    // Desactivar si sale de la pantalla
-    if (this.x < -this.width - 50) {
-      this.active = false;
+    this.fireTimer -= dt;
+    if (this.fireTimer <= 0 && this.x < CANVAS.WIDTH - 40 && this.x > world.player.x + 60) {
+      this.fireTimer = 1 / this.fireRate + rand(-0.3, 0.3);
+      this.fireAt(world);
     }
 
-    // Cooldown de disparo
-    if (this.shootTimer > 0) {
-      this.shootTimer--;
+    if (this.x + this.width < -20) {
+      this.dead = true;
+      this.escaped = true;
     }
   }
 
-  draw(ctx) {
-    if (!this.active) return;
-    ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
+  fireAt(world) {
+    const { player } = world;
+    // Apunta al jugador con cierta imprecisión
+    const aim = Math.atan2(player.cy - this.cy, player.cx - this.x) + rand(-0.12, 0.12);
+    world.spawnBullet(
+      new Bullet(this.x, this.cy, Math.cos(aim) * BULLET.ENEMY_SPEED, Math.sin(aim) * BULLET.ENEMY_SPEED, {
+        damage: BULLET.ENEMY_DAMAGE,
+        friendly: false,
+      })
+    );
   }
 
-  shoot() {
-    if (this.shootTimer > 0 || !this.active) return null;
-
-    this.shootTimer = this.shootDelay;
-
-    // TIE Fighters disparan 3 balas espaciadas
-    const bullets = [];
-    bullets.push(new EnemyBullet(this.x - 100, this.y + 20));
-    bullets.push(new EnemyBullet(this.x - 200, this.y + 40));
-    bullets.push(new EnemyBullet(this.x, this.y + 60));
-
-    return bullets;
-  }
-
+  /** Devuelve true si el daño lo destruyó. */
   takeDamage(amount) {
     this.hp -= amount;
+    this.hitFlash = 0.08;
     if (this.hp <= 0) {
-      this.destroy();
-      return true; // Murió
+      this.dead = true;
+      return true;
     }
     return false;
   }
 
-  destroy() {
-    this.active = false;
-  }
-
-  isOffScreen() {
-    return !this.active || this.x < -this.width - 50;
-  }
-
-  isColliding(other) {
-    if (!this.active) return false;
-    return Utils.isColliding(this, other);
+  draw(ctx) {
+    ctx.save();
+    if (this.hitFlash > 0) ctx.filter = 'brightness(2.5)';
+    if (this.type === 'TIE_INTERCEPTOR') {
+      ctx.shadowColor = '#ff4d4d';
+      ctx.shadowBlur = 10;
+    }
+    if (this.sprite) {
+      ctx.drawImage(this.sprite, this.x, this.y, this.width, this.height);
+    } else {
+      ctx.fillStyle = '#888';
+      ctx.fillRect(this.x, this.y, this.width, this.height);
+    }
+    ctx.restore();
   }
 }

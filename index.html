@@ -1,71 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="style.css" />
     <title>X-Wing: Asalto a la Estrella de la Muerte</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
-    <div id="main-container">
-      <div>
-        <h1>X-Wing: Asalto a la Estrella de la Muerte</h1>
-        <p>Destruye los TIE Fighters y derrota a los jefes imperiales<br>
-        Controles: WASD (movimiento) + J (disparar)<br>
-        May the force be with you</p>
-        <img src="images/ARROW-KEYS.png" alt="Arrow-Keys" />
+    <main>
+      <div class="frame">
+        <canvas id="game" tabindex="0" aria-label="Juego X-Wing"></canvas>
+        <p class="loading">Cargando…</p>
       </div>
-      <div class="left-container">
-      <canvas width="720" height="480"></canvas>
-      <div class ="button-container">
-        <button id="start-button">Start</button>
-        <button id="restart-button">Restart</button>
-      </div>
-    </div>
-
-    <!-- Orden de carga importante: Configuración -> Utils -> Entidades -> Managers -> Game -->
-    <!-- 1. Configuración y constantes -->
-    <script src="js/config/constants.js"></script>
-
-    <!-- 2. Utilidades -->
-    <script src="js/utils/helpers.js"></script>
-    <script src="js/utils/CSSSprites.js"></script>
-
-    <!-- 3. Entidades -->
-    <script src="js/entities/Background.js"></script>
-    <script src="js/entities/Player.js"></script>
-    <script src="js/entities/Bullet.js"></script>
-    <script src="js/entities/EnemyBullet.js"></script>
-    <script src="js/entities/Enemy.js"></script>
-    <script src="js/entities/PowerUp.js"></script>
-
-    <!-- 3.1. Bosses -->
-    <script src="js/entities/bosses/Boss.js"></script>
-    <script src="js/entities/bosses/TIEAdvanced.js"></script>
-    <script src="js/entities/bosses/StarDestroyer.js"></script>
-    <script src="js/entities/bosses/DeathStar.js"></script>
-
-    <!-- 4. UI -->
-    <script src="js/ui/HUD.js"></script>
-    <script src="js/ui/TransitionScreen.js"></script>
-
-    <!-- 5. Managers -->
-    <script src="js/managers/PhaseManager.js"></script>
-    <script src="js/managers/GameManager.js"></script>
-
-    <!-- 6. Código legacy (será eliminado en fases posteriores) -->
-    <!-- <script src="main.js"></script> -->
-
-    <!-- 7. Game (Entry point) -->
-    <script src="js/game.js"></script>
+      <ul class="controls">
+        <li><kbd>WASD</kbd>/<kbd>←↑↓→</kbd> mover</li>
+        <li><kbd>J</kbd>/<kbd>Espacio</kbd> disparar</li>
+        <li><kbd>K</kbd> torpedo</li>
+        <li><kbd>P</kbd>/<kbd>Esc</kbd> pausa</li>
+        <li><kbd>M</kbd> sonido</li>
+      </ul>
+    </main>
+    <script type="module" src="js/main.js"></script>
   </body>
 </html>
-
-    <!-- 2.1. Sistemas de efectos -->
-    <script src="js/utils/ParticleSystem.js"></script>
-    <script src="js/utils/VisualEffects.js"></script>
-
-    <!-- 4.1. UI Mejorada -->
-    <script src="js/ui/HUDEnhanced.js"></script>
-    <script src="js/ui/PauseScreen.js"></script>
-    <script src="js/ui/MainMenu.js"></script>
