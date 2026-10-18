@@ -1,4 +1,4 @@
-import { DIFFICULTIES, PHASE_TYPE, POWERUPS, SCORE } from '../config.js';
+import { CANVAS, DIFFICULTIES, PHASE_TYPE, POWERUPS, SCORE } from '../config.js';
 import { PHASE_STATUS } from '../sim/PhaseManager.js';
 
 /**
@@ -21,10 +21,23 @@ export function hpLevel(ratio) {
   return ratio > HP_THRESHOLDS.LOW ? HP_LEVEL.LOW : HP_LEVEL.CRITICAL;
 }
 
+/**
+ * Zonas de la pantalla (unidades de simulación) que tapan los paneles del HUD: si la nave pasa
+ * por debajo, el panel se vuelve transparente para no ocultarla.
+ */
+export const HUD_ZONES = {
+  hull: { x: 0, y: 0, width: 260, height: 120 },
+  score: { x: CANVAS.WIDTH - 200, y: 0, width: 200, height: 90 },
+};
+
+const under = (player, zone) =>
+  !player.dead && player.x < zone.x + zone.width && player.x + player.width > zone.x && player.y < zone.y + zone.height;
+
 export function buildHudModel(world, { highScore = 0, muted = false } = {}) {
   const { player, phases, boss } = world;
   const phase = phases.phase;
   return {
+    faded: { hull: under(player, HUD_ZONES.hull), score: under(player, HUD_ZONES.score) },
     hpRatio: player.hpRatio,
     hpLevel: hpLevel(player.hpRatio),
     lives: player.lives,
@@ -95,6 +108,7 @@ export function buildEndModel(world, { victory, highScore, newRecord }) {
 export const ALERTS = {
   bossStage: ({ stage }) => ({ text: stage.label, tone: 'danger' }),
   vaderMode: ({ mode }) => (mode === 'windup' ? { text: '¡Embestida! Sal de la franja roja', tone: 'danger' } : null),
+  vaderLock: () => ({ text: 'Vader te tiene en la mira', tone: 'danger' }),
   powerUpCollected: ({ cfg }) => ({ text: `${cfg.label} activado`, tone: 'info' }),
   playerDestroyed: ({ livesLeft }) => ({ text: livesLeft > 0 ? `Nave perdida · quedan ${livesLeft}` : 'Sin naves', tone: 'danger' }),
   phaseStart: ({ phase }) => (phase.type === PHASE_TYPE.BOSS ? { text: `Contacto: ${phase.name}`, tone: 'warning' } : null),

@@ -405,6 +405,12 @@ kbd {
   color: var(--cyan);
 }
 
+/* La nave pasa por debajo de un panel: se vuelve transparente para no ocultarla */
+.hud-hull[data-faded='true'],
+.hud-score[data-faded='true'] {
+  opacity: 0.3;
+}
+
 /* --------------------------------------------------------------- cartel de fase */
 
 .banner {

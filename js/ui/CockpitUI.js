@@ -113,6 +113,8 @@ export class CockpitUI {
 
   renderHud(m) {
     const hull = this.refs.hull;
+    this.set('faded:hull', m.faded.hull, (v) => (hull.closest('.hud-hull').dataset.faded = v));
+    this.set('faded:score', m.faded.score, (v) => (this.refs.score.closest('.hud-score').dataset.faded = v));
     this.meter('hull', m.hpRatio);
     this.set('hull:level', m.hpLevel, (v) => (hull.dataset.level = v));
     this.set('hull:aria', Math.round(m.hpRatio * 100), (v) => hull.setAttribute('aria-valuenow', v));

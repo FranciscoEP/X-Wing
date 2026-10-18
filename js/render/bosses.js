@@ -1,7 +1,7 @@
 import { rand } from '../core/utils.js';
 import { LASER, LASER_STATE, RADIUS } from '../sim/bosses/DeathStar.js';
 import { TURRETS } from '../sim/bosses/StarDestroyer.js';
-import { VADER_MODE } from '../sim/bosses/TieAdvanced.js';
+import { LOCK_STATE, PAIR, VADER_MODE } from '../sim/bosses/TieAdvanced.js';
 import { RENDER } from '../config.js';
 import { PAL } from './art/palette.js';
 import { drawSprite } from './art/SpriteCache.js';
@@ -52,11 +52,37 @@ function drawTieAdvanced(ctx, boss, { sprites, flash, time }) {
   // Halo rojo parpadeante durante el aviso de embestida
   if (boss.mode === VADER_MODE.WINDUP && Math.floor(time * 16) % 2) ring(ctx, cx, cy, 24, PAL.red, { dash: 3 });
   drawSprite(ctx, sprites.vader, cx, cy, { flash });
+  // Aviso de par rápido: los cañones brillan antes de disparar
+  if (boss.cannonCharge > 0 && Math.floor(time * 24) % 2 === 0) {
+    const gap = px(PAIR.GAP);
+    const x = cx - Math.floor(sprites.vader.w / 2) - 2;
+    for (const dy of [-gap, gap]) {
+      rect(ctx, x - 1, cy + dy - 1, 3, 3, PAL.redHi);
+      rect(ctx, x, cy + dy, 1, 1, PAL.white);
+    }
+  }
+}
+
+/** Mira de Vader: esquinas que siguen al jugador; al fijarse parpadean en blanco. */
+function drawLockReticle(ctx, lock, time) {
+  if (lock.state === LOCK_STATE.IDLE) return;
+  const locked = lock.state !== LOCK_STATE.TRACKING;
+  if (locked && Math.floor(time * 16) % 2) return;
+  const color = locked ? PAL.white : PAL.red;
+  const x = px(lock.x);
+  const y = px(lock.y);
+  const r = locked ? 8 : 11;
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    rect(ctx, x + sx * r - (sx > 0 ? 3 : 0), y + sy * r, 4, 1, color);
+    rect(ctx, x + sx * r, y + sy * r - (sy > 0 ? 3 : 0), 1, 4, color);
+  }
+  rect(ctx, x, y, 1, 1, color);
 }
 
 /** Aviso de embestida (franja roja) y escudo deflector, por encima del jugador. */
 function drawVaderOverlay(ctx, boss, { time }) {
   if (boss.dying) return;
+  drawLockReticle(ctx, boss.lock, time);
   if (boss.mode === VADER_MODE.WINDUP) {
     const y = px(boss.chargeY);
     const h = px(boss.height);

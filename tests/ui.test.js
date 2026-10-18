@@ -54,6 +54,14 @@ describe('UI: modelos de vista', () => {
     assert.equal(m.wave, null);
   });
 
+  it('un panel del HUD se vuelve transparente cuando la nave pasa por debajo', () => {
+    const world = makeWorld({ phase: 0 });
+    assert.deepEqual(buildHudModel(world).faded, { hull: false, score: false });
+    world.player.x = 20;
+    world.player.y = 10;
+    assert.equal(buildHudModel(world).faded.hull, true);
+  });
+
   it('el récord del HUD nunca es menor que la puntuación actual', () => {
     const world = makeWorld({ phase: 0 });
     world.score = 5000;

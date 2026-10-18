@@ -22,7 +22,7 @@ Shooter espacial en Canvas + JavaScript (ES modules, sin dependencias ni build).
 | TIE Interceptor | Cruza la pantalla en diagonal y suelta un abanico de 3 al pasar a tu altura | Línea roja por la diagonal antes de entrar | Apártate de la diagonal |
 | TIE Bomber | Suelta minas que estallan en un radio | La mina parpadea cada vez más rápido | Destrúyela de un disparo o rodéala |
 
-Cada nave dispara a su propio ritmo (`sim/ai/weapons.js`). Las formaciones (V, columna, tenaza, escalón, hostigamiento, pasada) y la ruptura al caer el líder siguen en `sim/ai/`. Darth Vader tiene tres etapas: persecución, embestida anunciada con una franja roja y escudo con escoltas.
+Cada nave dispara a su propio ritmo (`sim/ai/weapons.js`). Las formaciones (V, columna, tenaza, escalón, hostigamiento, pasada) y la ruptura al caer el líder siguen en `sim/ai/`. Darth Vader tiene tres etapas: 1) te persigue y dispara pares rápidos (sus cañones brillan antes); 2) además embiste tras una franja roja de aviso; 3) suma escudo, dos escoltas y una mira que te sigue 1,5 s, se fija y dispara una ráfaga a ese punto: muévete en cuanto se ponga blanca.
 
 Power-ups que sueltan los enemigos: disparo triple, fuego rápido, escudo, reparación y torpedos extra. En la Estrella de la Muerte solo el **puerto de escape** (círculo amarillo) recibe daño; esquiva el superláser cuando veas la línea verde punteada.
 

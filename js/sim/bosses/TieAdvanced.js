@@ -1,17 +1,20 @@
-import { CANVAS, FORMATION } from '../../config.js';
-import { clamp, rand } from '../../core/utils.js';
+import { BULLET, CANVAS, FORMATION } from '../../config.js';
+import { clamp } from '../../core/utils.js';
+import { interceptAngle } from '../ai/aim.js';
+import { Bullet } from '../entities/Bullet.js';
 import { Evasion } from '../ai/evasion.js';
 import { spawnSquadron } from '../ai/formations.js';
 import { Boss, HIT } from './Boss.js';
 
 /**
  * Etapas de combate según la vida restante. Cada una añade comportamientos a la anterior:
- * PURSUIT: persigue y dispara ráfagas · ASSAULT: además embiste · DESPERATE: además escudo y escoltas.
+ * PURSUIT: persigue y dispara pares rápidos · ASSAULT: además embiste ·
+ * DESPERATE: además escudo, escoltas y la mira que te fija antes de una ráfaga.
  */
 export const VADER_STAGE = {
   PURSUIT: { id: 'PURSUIT', minHp: 0.66, label: 'Vader te persigue' },
   ASSAULT: { id: 'ASSAULT', minHp: 0.33, label: '¡Vader embiste!' },
-  DESPERATE: { id: 'DESPERATE', minHp: 0, label: 'Escudo deflector y escoltas' },
+  DESPERATE: { id: 'DESPERATE', minHp: 0, label: 'Escudo, escoltas y mira' },
 };
 const STAGE_ORDER = [VADER_STAGE.PURSUIT, VADER_STAGE.ASSAULT, VADER_STAGE.DESPERATE];
 
@@ -26,16 +29,17 @@ const AI = {
   SWAY_FREQ: 0.8,
   X_EASE: 3,
   EDGE_MARGIN: 10,
-  BURST_SHOTS: 3,
-  BURST_SHOTS_DESPERATE: 5,
-  BURST_INTERVAL: 0.12,
-  PAUSE: 1.2,
-  PAUSE_DESPERATE: 0.7,
-  FAN_CHANCE: 0.4,
-  FAN_SHOTS: 7,
-  FAN_SPREAD: 1.1,
-  FAN_PAUSE: 1.1,
 };
+
+/** Pares rápidos: dos láseres paralelos apuntados, tras 0,25 s de aviso en los cañones. */
+export const PAIR = { EVERY: 1.0, EVERY_DESPERATE: 0.8, CHARGE: 0.25, GAP: 12, SPEED_FACTOR: 1.3 };
+
+/**
+ * Mira (etapa 3): sigue al jugador con retraso `TRACK` s, se fija `LOCKED` s (parpadea) y
+ * dispara una ráfaga de `SHOTS` al punto fijado. Si te mueves tras fijarse, fallará.
+ */
+export const LOCK = { EVERY: 4.5, TRACK: 1.5, LOCKED: 0.35, FOLLOW: 4, SHOTS: 5, SHOT_GAP: 0.08, SPEED_FACTOR: 1.2 };
+export const LOCK_STATE = { IDLE: 'idle', TRACKING: 'tracking', LOCKED: 'locked', FIRING: 'firing' };
 
 export const CHARGE = {
   EVERY: 5.5,
@@ -58,8 +62,9 @@ export class TieAdvanced extends Boss {
     super('TIE_ADVANCED', { targetX: CANVAS.WIDTH - 200, y: CANVAS.HEIGHT / 2 - 46 }, difficulty);
     this.stage = VADER_STAGE.PURSUIT;
     this.mode = VADER_MODE.PURSUE;
-    this.fireTimer = 1;
-    this.burstLeft = 0;
+    this.fireTimer = 1; // hasta el próximo par
+    this.pairCharge = 0; // s restantes del aviso del par (0 = sin aviso)
+    this.lock = { state: LOCK_STATE.IDLE, timer: LOCK.EVERY / 2, x: 0, y: 0, shotsLeft: 0 };
     this.vy = 0;
     this.chargeTimer = CHARGE.EVERY;
     this.chargeY = 0;
@@ -165,21 +170,76 @@ export class TieAdvanced extends Boss {
     }
   }
 
-  updateFire(dt, world, desperate) {
-    this.fireTimer -= dt;
-    if (this.fireTimer > 0) return;
+  /** Progreso 0..1 del aviso de cañones antes de un par (para el renderer). */
+  get cannonCharge() {
+    return this.pairCharge > 0 ? 1 - this.pairCharge / PAIR.CHARGE : 0;
+  }
 
-    if (this.burstLeft > 0) {
-      this.burstLeft--;
-      this.fireAt(world, this.x, this.cy);
-      this.fireTimer = AI.BURST_INTERVAL;
-    } else if (desperate && rand(0, 1) < AI.FAN_CHANCE) {
-      this.fireSpread(world, this.x, this.cy, Math.PI, { count: AI.FAN_SHOTS, spread: AI.FAN_SPREAD });
-      this.fireTimer = AI.FAN_PAUSE;
-    } else {
-      this.burstLeft = desperate ? AI.BURST_SHOTS_DESPERATE : AI.BURST_SHOTS;
-      this.fireTimer = desperate ? AI.PAUSE_DESPERATE : AI.PAUSE;
+  updateFire(dt, world, desperate) {
+    if (desperate) this.updateLock(dt, world);
+    // Mientras la mira trabaja no hay pares: un ataque peligroso a la vez
+    if (this.lock.state !== LOCK_STATE.IDLE) return;
+
+    if (this.pairCharge > 0) {
+      this.pairCharge -= dt;
+      if (this.pairCharge <= 0) this.firePair(world);
+      return;
     }
+    this.fireTimer -= dt;
+    if (this.fireTimer <= 0) {
+      this.pairCharge = PAIR.CHARGE;
+      this.fireTimer = desperate ? PAIR.EVERY_DESPERATE : PAIR.EVERY;
+    }
+  }
+
+  /** Dos láseres paralelos hacia donde estará el jugador. */
+  firePair(world) {
+    const speed = this.bulletSpeed() * PAIR.SPEED_FACTOR;
+    const angle = interceptAngle({ x: this.x, y: this.cy }, world.player, speed, this.difficulty.aimLead);
+    const nx = -Math.sin(angle);
+    const ny = Math.cos(angle);
+    for (const side of [-1, 1]) {
+      const ox = this.x + nx * side * PAIR.GAP;
+      const oy = this.cy + ny * side * PAIR.GAP;
+      world.spawnEnemyBullet(new Bullet(ox, oy, Math.cos(angle) * speed, Math.sin(angle) * speed, { damage: BULLET.ENEMY_DAMAGE, friendly: false }));
+    }
+  }
+
+  /** Ciclo de la mira: espera → sigue al jugador → se fija → ráfaga al punto fijado. */
+  updateLock(dt, world) {
+    const lock = this.lock;
+    const { player } = world;
+    lock.timer -= dt;
+    switch (lock.state) {
+      case LOCK_STATE.IDLE:
+        if (lock.timer <= 0 && this.mode === VADER_MODE.PURSUE) {
+          Object.assign(lock, { state: LOCK_STATE.TRACKING, timer: LOCK.TRACK, x: player.cx, y: player.cy });
+          world.emit('vaderLock', { boss: this });
+        }
+        break;
+      case LOCK_STATE.TRACKING:
+        lock.x += (player.cx - lock.x) * (1 - Math.exp(-LOCK.FOLLOW * dt));
+        lock.y += (player.cy - lock.y) * (1 - Math.exp(-LOCK.FOLLOW * dt));
+        if (lock.timer <= 0) Object.assign(lock, { state: LOCK_STATE.LOCKED, timer: LOCK.LOCKED });
+        break;
+      case LOCK_STATE.LOCKED:
+        if (lock.timer <= 0) Object.assign(lock, { state: LOCK_STATE.FIRING, timer: 0, shotsLeft: LOCK.SHOTS });
+        break;
+      case LOCK_STATE.FIRING:
+        if (lock.timer <= 0) {
+          this.fireAtPoint(world, lock.x, lock.y);
+          lock.shotsLeft--;
+          lock.timer = LOCK.SHOT_GAP;
+          if (lock.shotsLeft <= 0) Object.assign(lock, { state: LOCK_STATE.IDLE, timer: LOCK.EVERY });
+        }
+        break;
+    }
+  }
+
+  fireAtPoint(world, x, y) {
+    const speed = this.bulletSpeed() * LOCK.SPEED_FACTOR;
+    const angle = Math.atan2(y - this.cy, x - this.x);
+    world.spawnEnemyBullet(new Bullet(this.x, this.cy, Math.cos(angle) * speed, Math.sin(angle) * speed, { damage: BULLET.ENEMY_DAMAGE, friendly: false, thickness: 4 }));
   }
 
   /** Con el escudo activo los disparos rebotan. */
