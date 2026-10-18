@@ -15,7 +15,14 @@ afterEach(resetRandomSource);
 function autopilot(world) {
   godMode(world);
   const { player, boss } = world;
+  const port = world.trench?.port;
   let targetY = player.cy;
+  if (port && !port.destroyed) {
+    // Trinchera: alinearse con el puerto y lanzar un torpedo (los láseres no bastan)
+    const dy = port.cy - player.cy;
+    const torpedo = Math.abs(dy) < 12 && world.torpedoes.length === 0;
+    return { moveY: Math.abs(dy) > 4 ? Math.sign(dy) : 0, moveX: player.x > 160 ? -1 : 0, shoot: true, torpedo };
+  }
   if (boss?.vulnerable) {
     targetY = boss.targetPoint.y;
   } else {

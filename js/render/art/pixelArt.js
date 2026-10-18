@@ -138,4 +138,18 @@ export const TIE_BOMBER = {
   },
 };
 
-export const ENEMY_ART = { TIE_FIGHTER, TIE_INTERCEPTOR, TIE_BOMBER };
+/** Torreta de la pared de la trinchera (anclada arriba; SpriteCache crea la versión del suelo). */
+export const TRENCH_TURRET = {
+  w: 20,
+  h: 16,
+  paint(p) {
+    p.r(0, 0, 20, 4, PAL.dark); // anclaje a la pared
+    p.r(2, 4, 16, 4, PAL.imperialDk);
+    p.c(10, 10, 5, PAL.imperial);
+    p.r(6, 11, 9, 2, PAL.imperialDk);
+    p.r(0, 9, 6, 2, PAL.mid); // cañón hacia la izquierda
+    p.r(9, 9, 2, 2, PAL.red);
+  },
+};
+
+export const ENEMY_ART = { TIE_FIGHTER, TIE_INTERCEPTOR, TIE_BOMBER, TRENCH_TURRET };

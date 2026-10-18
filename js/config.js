@@ -96,6 +96,8 @@ export const ENEMY_TYPES = {
   TIE_FIGHTER: { hp: 20, speed: 140, fireRate: 0.5, score: 100, size: 56, wobble: 30, weapon: 'TWIN', dodge: { chance: 0.15, reaction: 0.3, speed: 220, cooldown: 1.5 } },
   TIE_INTERCEPTOR: { hp: 30, speed: 220, fireRate: 0.8, score: 150, size: 50, wobble: 50, weapon: 'FAN', dodge: { chance: 0.55, reaction: 0.35, speed: 320, cooldown: 0.9 } },
   TIE_BOMBER: { hp: 60, speed: 70, fireRate: 0.45, score: 250, size: 62, wobble: 12, weapon: 'MINES', dodge: { chance: 0, reaction: 0, speed: 0, cooldown: 0 } },
+  // Anclada a la pared de la trinchera: se desplaza con ella (sim/trench/Trench.js)
+  TRENCH_TURRET: { hp: 20, speed: 180, fireRate: 0.45, score: 120, size: 40, wobble: 0, weapon: 'TRIO', dodge: { chance: 0, reaction: 0, speed: 0, cooldown: 0 } },
 };
 
 /**
@@ -108,6 +110,7 @@ export const WEAPONS = {
   TWIN: { align: 40, charge: 0.3, gap: 10, cooldownMin: 0.8, cooldownMax: 1.6, speedFactor: 1.1 },
   FAN: { align: 60, count: 3, spread: 0.35, shots: 1 },
   MINES: { every: 2.2, firstMin: 0.6, firstMax: 1.4, minDistance: 120 },
+  TRIO: { every: 2.2, firstMin: 0.4, firstMax: 1.2, charge: 0.5, count: 3, spread: 0.18, speedFactor: 0.7 },
 };
 
 /** Mina del TIE Bomber: flota `lifetime` s y estalla; si te acercas, se arma con `fuse` s de margen. */
@@ -125,10 +128,9 @@ export const BOSS_TYPES = {
   TIE_ADVANCED: { name: 'TIE Advanced x1 — Darth Vader', hp: 600, score: 3000, width: 80, height: 68 },
   // hp del Destructor: la suma de sus partes (sim/bosses/StarDestroyer.js)
   STAR_DESTROYER: { name: 'Destructor Estelar clase Imperial', hp: 1070, score: 6000, width: 520, height: 260 },
-  DEATH_STAR: { name: 'Estrella de la Muerte', hp: 700, score: 15000, width: 420, height: 420 },
 };
 
-export const PHASE_TYPE = { WAVE: 'WAVE', BOSS: 'BOSS' };
+export const PHASE_TYPE = { WAVE: 'WAVE', BOSS: 'BOSS', TRENCH: 'TRENCH' };
 
 /**
  * Las oleadas llegan en escuadrones: se eligen de `squadrons` al azar según `weight` (sin repetir
@@ -169,10 +171,42 @@ export const PHASES = [
     ],
   },
   { type: PHASE_TYPE.BOSS, name: 'Destructor Estelar', objective: 'Destruye sus torretas y luego el puente', boss: 'STAR_DESTROYER' },
-  { type: PHASE_TYPE.BOSS, name: 'Estrella de la Muerte', objective: 'Dispara al puerto de escape', boss: 'DEATH_STAR' },
+  {
+    // Final contra el reloj (sim/trench/Trench.js): entrada tranquila, torretas en las paredes,
+    // Vader detrás y el puerto de escape, que solo cae con un torpedo antes de que acabe la cuenta.
+    type: PHASE_TYPE.TRENCH,
+    name: 'La trinchera',
+    objective: 'Torpedo al puerto de escape antes de 60 s',
+  },
 ];
 
 export const PHASE_BANNER_TIME = 2.5;
+
+/**
+ * Carrera por la trinchera (tiempos en segundos desde que empieza la fase).
+ * duration: cuenta regresiva hasta el superláser · calm: entrada sin torretas (respiro) ·
+ * vaderAt / portAt: cuándo aparecen Vader y el puerto · top/bottom: bordes del pasillo.
+ */
+export const TRENCH = {
+  duration: 60,
+  calm: 10,
+  vaderAt: 20,
+  portAt: 38,
+  speed: 180,
+  top: 110,
+  bottom: 430,
+  minPlayerX: 90,
+  turretEvery: 1.5,
+  turretJitter: 0.5,
+  torpedoRefill: 2,
+  portScore: 25000,
+};
+
+/** Puerto de escape: solo un torpedo lo destruye; los láseres rebotan. */
+export const PORT = { width: 36, height: 36, stopXRatio: 0.72, speed: 120 };
+
+/** Vader persiguiendo desde atrás en la trinchera: pares hacia delante con aviso. */
+export const TRENCH_VADER = { x: -36, follow: 1.4, every: 2.4, charge: 0.45, gap: 12, speedFactor: 1.1 };
 
 // `duration` en segundos = efecto temporal; el resto se aplica al instante (ver sim/powerups.js).
 export const POWERUPS = {

@@ -405,6 +405,27 @@ kbd {
   color: var(--cyan);
 }
 
+/* Cuenta regresiva de la trinchera */
+.countdown-label {
+  margin: 0;
+  color: var(--light);
+  font: calc(var(--u) * 9) / 1 var(--font-term);
+  text-transform: uppercase;
+  text-shadow: var(--u) var(--u) 0 var(--outline);
+}
+
+.countdown-time {
+  margin: calc(var(--u) * 2) 0 0;
+  color: var(--yellow);
+  font: calc(var(--u) * 16) / 1 var(--font-pixel);
+  text-shadow: calc(var(--u) * 2) calc(var(--u) * 2) 0 var(--outline);
+}
+
+.countdown[data-urgent='true'] .countdown-time {
+  color: var(--red-hi);
+  animation: blink 0.5s steps(2) infinite;
+}
+
 /* La nave pasa por debajo de un panel: se vuelve transparente para no ocultarla */
 .hud-hull[data-faded='true'],
 .hud-score[data-faded='true'] {

@@ -10,6 +10,7 @@ export function resolveCollisions(world) {
   torpedoes(world);
   playerBulletsVsEnemies(world);
   playerBulletsVsMines(world);
+  playerBulletsVsPort(world);
   playerBulletsVsBoss(world);
   if (world.player.dead) return;
   enemyBulletsVsPlayer(world);
@@ -21,13 +22,16 @@ export function resolveCollisions(world) {
 /** Un torpedo detona al tocar un enemigo, una mina o un jefe, o al agotar su vuelo. */
 function torpedoes(world) {
   const { boss } = world;
+  const port = world.trench?.port;
   for (const torpedo of world.torpedoes) {
     if (torpedo.dead) continue;
     const bossHit = boss?.vulnerable ? boss.hitTest(torpedo) : null;
     const touchesEnemy = world.enemies.some((e) => !e.dead && overlaps(torpedo, e));
     const touchesMine = world.mines.some((m) => !m.dead && overlaps(torpedo, m));
-    if (bossHit || touchesEnemy || touchesMine || torpedo.expired) {
+    const portHit = port && !port.destroyed && overlaps(torpedo, port);
+    if (bossHit || touchesEnemy || touchesMine || portHit || torpedo.expired) {
       world.detonateTorpedo(torpedo, { directBossHit: bossHit === HIT.DAMAGE });
+      if (portHit) world.destroyPort();
     }
   }
 }
@@ -51,6 +55,17 @@ function playerBulletsVsMines(world) {
     if (!mine) continue;
     bullet.dead = true;
     if (mine.takeDamage(bullet.damage)) world.destroyMine(mine);
+  }
+}
+
+/** Los láseres no bastan para el puerto de escape: rebotan (hace falta un torpedo). */
+function playerBulletsVsPort(world) {
+  const port = world.trench?.port;
+  if (!port || port.destroyed) return;
+  for (const bullet of world.playerBullets) {
+    if (bullet.dead || !overlaps(bullet, port)) continue;
+    bullet.dead = true;
+    world.emit('portDeflect', { x: bullet.cx, y: bullet.cy });
   }
 }
 

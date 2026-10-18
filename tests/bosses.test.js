@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import { PHASES, TORPEDO } from '../js/config.js';
 import { centerOf } from '../js/core/utils.js';
 import { HIT } from '../js/sim/bosses/Boss.js';
-import { LASER_STATE } from '../js/sim/bosses/DeathStar.js';
 import { Torpedo } from '../js/sim/entities/Torpedo.js';
 import { PHASE_STATUS } from '../js/sim/PhaseManager.js';
 import { emitted, godMode, makeWorld, playerBulletAt, resetRandomSource, run, useSeed, waitBossReady } from './helpers.js';
@@ -21,7 +20,7 @@ const aimAt = (getY) => (world) => {
 };
 
 describe('jefes: comunes', () => {
-  for (const type of ['TIE_ADVANCED', 'STAR_DESTROYER', 'DEATH_STAR']) {
+  for (const type of ['TIE_ADVANCED', 'STAR_DESTROYER']) {
     it(`${type}: es invulnerable mientras entra y vulnerable después`, () => {
       const world = makeWorld({ phase: phaseOf(type) });
       run(world, 10, {}, { until: (w) => w.boss });
@@ -58,74 +57,5 @@ describe('TIE Advanced', () => {
     run(world, 6, aimAt((w) => w.boss.cy));
     assert.ok(world.boss.hp < world.boss.maxHp);
     assert.ok(shots > 0, 'Vader no disparó');
-  });
-});
-
-describe('Estrella de la Muerte', () => {
-  /** `frozen`: el jefe deja de moverse y atacar, para disparar a un punto fijo. */
-  const ready = ({ frozen = false } = {}) => {
-    const world = makeWorld({ phase: phaseOf('DEATH_STAR') });
-    waitBossReady(world);
-    if (frozen) world.boss.behave = () => {};
-    return world;
-  };
-  const portY = (w) => centerOf(w.boss.port).y;
-
-  it('regresión: lo que entra en la esfera a la altura del puerto cuenta como impacto', () => {
-    const world = ready();
-    const { boss } = world;
-    const port = centerOf(boss.port);
-    // Justo dentro del borde de la esfera, a la izquierda del puerto: antes devolvía ARMOR
-    const edge = { x: boss.cx - Math.sqrt(boss.width ** 2 / 4 - (port.y - boss.cy) ** 2) + 2, y: port.y - 1.5, width: 22, height: 3 };
-    assert.equal(boss.hitTest(edge), HIT.DAMAGE);
-  });
-
-  it('regresión: un láser horizontal a la altura del puerto lo daña (no rebota en el borde)', () => {
-    const world = ready({ frozen: true });
-    const { boss } = world;
-    const hp = boss.hp;
-    world.playerBullets.push(playerBulletAt(world.player.x + 100, portY(world)));
-    run(world, 1, godMode, { until: (w) => w.playerBullets.length === 0 });
-    assert.ok(boss.hp < hp, 'el disparo al puerto no hizo daño');
-    assert.equal(emitted(world, 'bossHit').length, 1);
-  });
-
-  it('regresión: apuntar el centro de la nave al puerto le quita vida de forma sostenida', () => {
-    const world = ready();
-    run(world, 15, aimAt(portY));
-    assert.ok(world.boss.hp < world.boss.maxHp * 0.7, `solo bajó a ${world.boss.hp}/${world.boss.maxHp}`);
-  });
-
-  it('un disparo lejos del puerto rebota en el blindaje', () => {
-    const world = ready({ frozen: true });
-    const { boss } = world;
-    const y = portY(world) > boss.cy ? portY(world) - 120 : portY(world) + 120;
-    world.playerBullets.push(playerBulletAt(world.player.x + 100, y));
-    run(world, 1, godMode, { until: (w) => w.playerBullets.length === 0 });
-    assert.equal(boss.hp, boss.maxHp);
-    assert.equal(emitted(world, 'armorHit').length, 1);
-  });
-
-  it('un torpedo en el puerto causa daño directo', () => {
-    const world = ready({ frozen: true });
-    const { boss } = world;
-    world.torpedoes.push(new Torpedo(boss.port.x - 40, portY(world)));
-    run(world, 0.5, godMode, { until: (w) => w.torpedoes.length === 0 });
-    assert.equal(boss.hp, boss.maxHp - TORPEDO.BOSS_DAMAGE);
-  });
-
-  it('el superláser fija la altura del jugador, avisa y daña si no se mueve', () => {
-    const world = ready();
-    world.player.invulnerable = 0;
-    run(world, 12, {}, { until: (w) => w.boss.laserState === LASER_STATE.CHARGING });
-    assert.equal(world.boss.laserY, world.player.cy, 'apunta a la altura del jugador');
-    const hp = world.player.hp;
-    // Se eliminan las demás balas para medir solo el daño del rayo
-    const onlyLaser = (w) => {
-      w.enemyBullets.length = 0;
-      return {};
-    };
-    run(world, 3, onlyLaser, { until: (w) => emitted(w, 'superlaser').length > 0 && w.boss.laserState === LASER_STATE.IDLE });
-    assert.ok(world.player.hp < hp || world.player.dead, 'el rayo no hizo daño');
   });
 });

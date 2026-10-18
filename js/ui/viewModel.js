@@ -38,6 +38,7 @@ export function buildHudModel(world, { highScore = 0, muted = false } = {}) {
   const phase = phases.phase;
   return {
     faded: { hull: under(player, HUD_ZONES.hull), score: under(player, HUD_ZONES.score) },
+    countdown: world.trench && !world.trench.won ? { time: formatTime(Math.ceil(world.trench.timeLeft)), urgent: world.trench.timeLeft <= 10 } : null,
     hpRatio: player.hpRatio,
     hpLevel: hpLevel(player.hpRatio),
     lives: player.lives,
@@ -89,7 +90,11 @@ export function buildEndModel(world, { victory, highScore, newRecord }) {
   return {
     victory,
     title: victory ? '¡Victoria!' : 'Nave derribada',
-    subtitle: victory ? 'La Estrella de la Muerte ha sido destruida' : `Caíste en la fase ${world.phases.number}: ${world.phases.phase?.name ?? ''}`,
+    subtitle: victory
+      ? 'La Estrella de la Muerte ha sido destruida'
+      : world.outcomeReason === 'superlaser'
+        ? 'Se acabó el tiempo: la Estrella de la Muerte disparó'
+        : `Caíste en la fase ${world.phases.number}: ${world.phases.phase?.name ?? ''}`,
     score: formatScore(world.score),
     newRecord,
     highScore: formatScore(highScore),
@@ -111,6 +116,10 @@ export const ALERTS = {
   vaderLock: () => ({ text: 'Vader te tiene en la mira', tone: 'danger' }),
   bossPartDestroyed: ({ part }) => ({ text: `${part.cfg.label}: destruida`, tone: 'info' }),
   bridgeExposed: () => ({ text: '¡Puente expuesto! Dispara al puente', tone: 'warning' }),
+  trenchStart: () => ({ text: 'Escudo reparado · +2 torpedos', tone: 'info' }),
+  trenchVader: () => ({ text: '¡Vader detrás de ti!', tone: 'danger' }),
+  portInRange: () => ({ text: '¡Puerto a la vista! Torpedo (K)', tone: 'warning' }),
+  portDeflect: () => ({ text: 'Los láseres no bastan: usa un torpedo', tone: 'info' }),
   powerUpCollected: ({ cfg }) => ({ text: `${cfg.label} activado`, tone: 'info' }),
   playerDestroyed: ({ livesLeft }) => ({ text: livesLeft > 0 ? `Nave perdida · quedan ${livesLeft}` : 'Sin naves', tone: 'danger' }),
   phaseStart: ({ phase }) => (phase.type === PHASE_TYPE.BOSS ? { text: `Contacto: ${phase.name}`, tone: 'warning' } : null),

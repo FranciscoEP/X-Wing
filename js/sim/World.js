@@ -1,4 +1,4 @@
-import { COMBAT, MINE, PHASE_TYPE, POWERUPS, SCORE, TORPEDO } from '../config.js';
+import { COMBAT, MINE, PHASE_TYPE, PLAYER, POWERUPS, SCORE, TORPEDO, TRENCH } from '../config.js';
 import { EventBus } from '../core/EventBus.js';
 import { random } from '../core/random.js';
 import { centerOf, distance, prune, weightedPick } from '../core/utils.js';
@@ -9,6 +9,7 @@ import { Enemy } from './entities/Enemy.js';
 import { Player } from './entities/Player.js';
 import { PowerUp } from './entities/PowerUp.js';
 import { PhaseManager } from './PhaseManager.js';
+import { Trench } from './trench/Trench.js';
 import { applyPowerUp } from './powerups.js';
 
 export const OUTCOME = { VICTORY: 'victory', DEFEAT: 'defeat' };
@@ -20,7 +21,7 @@ export const OUTCOME = { VICTORY: 'victory', DEFEAT: 'defeat' };
  * Eventos: shot, enemyHit, enemyDestroyed, enemyEscaped, bossHit, armorHit, bossDying,
  * bossDestroyed, explosion, shieldBlock, playerHit, playerDestroyed, playerRespawn,
  * powerUpCollected, torpedoLaunched, torpedoBlast, superlaser, enemyDodge, enemyDive, squadronBroken,
- * bossPartDestroyed, bridgeExposed, beamCharge, hangarLaunch, mineDropped, mineArmed, mineBlast, mineDestroyed, enemyCharge, enemyTwinShot, enemyPass, bossStage, scored, phaseStart, phaseClear, gameOver.
+ * bossPartDestroyed, bridgeExposed, trenchStart, trenchVader, portInRange, portDeflect, portDestroyed, beamCharge, hangarLaunch, mineDropped, mineArmed, mineBlast, mineDestroyed, enemyCharge, enemyTwinShot, enemyPass, bossStage, scored, phaseStart, phaseClear, gameOver.
  */
 export class World {
   constructor({ difficulty, events = new EventBus() }) {
@@ -38,6 +39,8 @@ export class World {
     this.score = 0;
     this.respawnTimer = 0;
     this.outcome = null;
+    this.outcomeReason = null;
+    this.trench = null;
     this.stats = { time: 0, shotsFired: 0, shotsHit: 0, kills: 0, damageTaken: 0, torpedoes: 0 };
     this.phases = new PhaseManager({
       onPhaseStart: (phase) => this.onPhaseStart(phase),
@@ -65,6 +68,7 @@ export class World {
     this.phases.update(dt);
 
     this.player.update(dt, controls);
+    this.trench?.confine(this.player);
     if (controls.shoot) this.playerShoot();
     if (controls.torpedo) this.launchTorpedo();
 
@@ -79,6 +83,7 @@ export class World {
     for (const p of this.powerUps) p.update(dt);
     for (const m of this.mines) m.update(dt, this);
     this.boss?.update(dt, this);
+    this.trench?.update(dt, this);
 
     resolveCollisions(this);
     this.removeDead();
@@ -238,7 +243,35 @@ export class World {
 
   onPhaseStart(phase) {
     if (phase.type === PHASE_TYPE.BOSS) this.boss = createBoss(phase.boss, this.difficulty);
+    if (phase.type === PHASE_TYPE.TRENCH) this.startTrench();
     this.emit('phaseStart', { phase });
+  }
+
+  /** Entrada a la trinchera: el respiro antes del final (escudo reparado y torpedos extra). */
+  startTrench() {
+    this.trench = new Trench(this.difficulty);
+    this.player.heal(PLAYER.MAX_HP);
+    this.player.addTorpedoes(TRENCH.torpedoRefill);
+    this.emit('trenchStart');
+  }
+
+  /** Un torpedo alcanzó el puerto de escape: la Estrella de la Muerte está condenada. */
+  destroyPort() {
+    const { trench } = this;
+    if (!trench?.port || trench.port.destroyed) return;
+    trench.port.destroyed = true;
+    trench.won = true;
+    this.enemyBullets.length = 0;
+    this.addScore(TRENCH.portScore, { x: trench.port.cx, y: trench.port.cy });
+    this.emit('portDestroyed', { x: trench.port.cx, y: trench.port.cy });
+    this.phases.clear();
+  }
+
+  /** Se acabó la cuenta: el superláser dispara y la misión fracasa. */
+  superlaserFired() {
+    if (this.isOver) return;
+    this.emit('superlaser');
+    this.finish(OUTCOME.DEFEAT, 'superlaser');
   }
 
   onPhaseClear(phase, flawless) {
@@ -248,9 +281,10 @@ export class World {
     this.emit('phaseClear', { phase, flawless });
   }
 
-  finish(outcome) {
+  finish(outcome, reason = null) {
     if (this.isOver) return;
     this.outcome = outcome;
+    this.outcomeReason = reason;
     this.emit('gameOver', { outcome, score: this.score });
   }
 

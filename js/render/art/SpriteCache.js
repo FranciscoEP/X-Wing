@@ -13,6 +13,17 @@ export class SpriteCache {
     this.player = this.build(XWING);
     this.enemies = Object.fromEntries(Object.entries(ENEMY_ART).map(([type, art]) => [type, this.withFlash(this.build(art))]));
     this.vader = this.withFlash(this.build(TIE_ADVANCED));
+    // La torreta del suelo es la de la pared superior reflejada en vertical
+    this.enemies.TRENCH_TURRET_BOTTOM = this.withFlash(this.flipY(this.enemies.TRENCH_TURRET));
+  }
+
+  flipY(sprite) {
+    const canvas = this.createCanvas(sprite.w, sprite.h);
+    const ctx = canvas.getContext('2d');
+    ctx.translate?.(0, sprite.h);
+    ctx.scale?.(1, -1);
+    ctx.drawImage(sprite.canvas, 0, 0);
+    return { canvas, w: sprite.w, h: sprite.h };
   }
 
   build(art) {

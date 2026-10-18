@@ -58,10 +58,17 @@ export function drawEnemy(ctx, enemy, sprites, time) {
   if (warning) return drawPassWarning(ctx, warning, time);
   const cx = px(enemy.cx);
   const cy = px(enemy.cy);
-  const sprite = sprites.enemies[enemy.type];
+  const key = enemy.type === 'TRENCH_TURRET' && !enemy.onTop ? 'TRENCH_TURRET_BOTTOM' : enemy.type;
+  const sprite = sprites.enemies[key];
   drawSprite(ctx, sprite, cx, cy, { flash: enemy.hitFlash > 0 });
+  // Aviso de la torreta de trinchera: el cañón se pone al rojo antes del trío
+  if (enemy.weapon.kind === 'TRIO' && enemy.weapon.charge > 0) {
+    const r = 1 + Math.round(enemy.weapon.charge * 3);
+    circle(ctx, cx - 10, cy, r, Math.floor(time * 20) % 2 ? PAL.orange : PAL.yellow);
+    return;
+  }
   // Aviso del TIE Fighter: sus cañones brillan antes del disparo doble
-  if (enemy.weapon.charge > 0 && Math.floor(time * 20) % 2 === 0) {
+  if (enemy.weapon.kind === 'TWIN' && enemy.weapon.charge > 0 && Math.floor(time * 20) % 2 === 0) {
     const gap = px(WEAPONS.TWIN.gap);
     const x = cx - Math.floor(sprite.w / 2) - 1;
     for (const dy of [-gap, gap]) {

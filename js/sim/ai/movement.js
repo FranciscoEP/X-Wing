@@ -162,4 +162,15 @@ export function slash({ startX, fromTop, warn = 0.7, speedFactor = 2.2 }) {
   };
 }
 
+/** Anclada a la pared: se desplaza con la trinchera a `speed` fija, sin cambiar de altura. */
+export function scroll({ y, speed }) {
+  return {
+    name: 'scroll',
+    update(enemy, dt) {
+      enemy.x -= speed * dt;
+      return y;
+    },
+  };
+}
+
 export const SPAWN_X = CANVAS.WIDTH + 10;

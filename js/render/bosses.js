@@ -1,5 +1,4 @@
 import { rand } from '../core/utils.js';
-import { LASER, LASER_STATE, RADIUS } from '../sim/bosses/DeathStar.js';
 import { ATTACK } from '../sim/bosses/StarDestroyer.js';
 import { paintStarDestroyerHull } from './art/starDestroyer.js';
 import { LOCK_STATE, PAIR, VADER_MODE } from '../sim/bosses/TieAdvanced.js';
@@ -17,9 +16,7 @@ const HIT_FLASH = 'rgba(255, 255, 255, 0.35)';
  */
 export const BOSS_RENDERERS = {
   TIE_ADVANCED: { body: drawTieAdvanced, overlay: drawVaderOverlay, pixel: true },
-  // Provisionales: vectores escalados al búfer. Se rehacen en pixel art en los pasos 4 y 5.
   STAR_DESTROYER: { body: drawStarDestroyer, overlay: drawSweepBeam, pixel: true },
-  DEATH_STAR: { body: drawDeathStar, overlay: drawSuperlaser },
 };
 
 /** Los jefes pixel dibujan en píxeles del búfer; los provisionales, en unidades de simulación escaladas. */
@@ -185,94 +182,4 @@ function drawSweepBeam(ctx, boss, { time }) {
   const dy = Math.sin(beam.angle);
   line(ctx, ox, oy, ox + dx * len, oy + dy * len, PAL.red, 4);
   line(ctx, ox, oy + 1, ox + dx * len, oy + dy * len + 1, PAL.white, 2);
-}
-
-function drawDeathStar(ctx, boss, { time, flash }) {
-  const { cx, cy } = boss;
-
-  // Esfera
-  const grad = ctx.createRadialGradient(cx - 70, cy - 70, 20, cx, cy, RADIUS);
-  grad.addColorStop(0, '#b8bec8');
-  grad.addColorStop(0.7, '#6f7682');
-  grad.addColorStop(1, '#2c3038');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(cx, cy, RADIUS, 0, Math.PI * 2);
-  ctx.fill();
-  if (flash) {
-    ctx.fillStyle = HIT_FLASH;
-    ctx.fill();
-  }
-
-  // Trinchera ecuatorial y paneles
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy, RADIUS, 0, Math.PI * 2);
-  ctx.clip();
-  ctx.fillStyle = '#353a43';
-  ctx.fillRect(cx - RADIUS, cy - 5, RADIUS * 2, 10);
-  ctx.strokeStyle = 'rgba(30, 33, 40, 0.5)';
-  for (let i = -4; i <= 4; i++) {
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, RADIUS, Math.abs(i) * 45 + 4, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // Plato del superláser
-  const { x: dx, y: dy } = boss.dish;
-  ctx.fillStyle = '#4a505a';
-  ctx.strokeStyle = '#2c3038';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(dx, dy, 52, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  if (boss.laserState === LASER_STATE.CHARGING) {
-    const p = 1 - boss.laserTimer / LASER.CHARGE;
-    ctx.fillStyle = `rgba(77, 255, 106, ${0.3 + p * 0.7})`;
-    ctx.shadowColor = '#4dff6a';
-    ctx.shadowBlur = 30 * p;
-    ctx.beginPath();
-    ctx.arc(dx, dy, 10 + p * 22, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    // Aviso de la línea de fuego
-    const beam = boss.beam;
-    ctx.strokeStyle = `rgba(77, 255, 106, ${0.25 + 0.25 * Math.sin(time * 30)})`;
-    ctx.setLineDash([12, 10]);
-    ctx.lineWidth = 2;
-    ctx.strokeRect(beam.x, beam.y, beam.width, beam.height);
-    ctx.setLineDash([]);
-  }
-
-  // Puerto de escape (punto débil)
-  const port = boss.port;
-  const pulse = 0.6 + 0.4 * Math.sin(time * 8);
-  ctx.fillStyle = '#111';
-  ctx.strokeStyle = `rgba(255, 210, 60, ${pulse})`;
-  ctx.lineWidth = 3;
-  ctx.shadowColor = '#ffd23c';
-  ctx.shadowBlur = 14;
-  ctx.beginPath();
-  ctx.arc(port.x + port.width / 2, port.y + port.height / 2, 11, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-}
-
-function drawSuperlaser(ctx, boss) {
-  if (boss.laserState !== LASER_STATE.FIRING || boss.dying) return;
-  const beam = boss.beam;
-  const g = ctx.createLinearGradient(0, beam.y, 0, beam.y + beam.height);
-  g.addColorStop(0, 'rgba(77, 255, 106, 0)');
-  g.addColorStop(0.5, 'rgba(220, 255, 220, 1)');
-  g.addColorStop(1, 'rgba(77, 255, 106, 0)');
-  ctx.save();
-  ctx.shadowColor = '#4dff6a';
-  ctx.shadowBlur = 30;
-  ctx.fillStyle = g;
-  ctx.fillRect(beam.x, beam.y, beam.width, beam.height);
-  ctx.restore();
 }

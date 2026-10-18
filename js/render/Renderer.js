@@ -6,6 +6,7 @@ import { Effects } from './Effects.js';
 import { drawBullet, drawEnemy, drawHitbox, drawMine, drawPlayer, drawPowerUp, drawTorpedo } from './entities.js';
 import { bindVisualFeedback } from './feedback.js';
 import { Particles } from './Particles.js';
+import { drawPort, drawTrenchBackground, drawTrenchVader } from './trench.js';
 
 export const SCENE = { MENU: 'menu', PLAYING: 'playing', PAUSED: 'paused', GAME_OVER: 'gameover', VICTORY: 'victory' };
 
@@ -45,7 +46,10 @@ export class Renderer {
     const { ctx } = this;
     const shake = this.effects.shakeOffset();
     ctx.setTransform(1, 0, 0, 1, shake.x, shake.y);
-    this.background.draw(ctx);
+    // En la trinchera, sus paredes y suelo sustituyen al espacio
+    const trench = scene.state !== SCENE.MENU && scene.world?.trench;
+    if (trench) drawTrenchBackground(ctx, trench);
+    else this.background.draw(ctx);
     if (scene.state !== SCENE.MENU && scene.world) this.drawWorld(scene.world, scene.time, scene);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.effects.drawFlash(ctx, RENDER.WIDTH, RENDER.HEIGHT);
@@ -57,9 +61,11 @@ export class Renderer {
     if (world.boss) drawBoss(ctx, world.boss, assets);
     for (const p of world.powerUps) drawPowerUp(ctx, p);
     for (const m of world.mines) drawMine(ctx, m, time);
+    if (world.trench) drawPort(ctx, world.trench.port, time);
     for (const e of world.enemies) drawEnemy(ctx, e, sprites, time);
     for (const b of world.playerBullets) drawBullet(ctx, b);
     for (const t of world.torpedoes) drawTorpedo(ctx, t, time);
+    if (world.trench) drawTrenchVader(ctx, world.trench.vader, sprites, time);
     drawPlayer(ctx, world.player, sprites, time);
     if (scene.showHitbox && !world.player.dead) drawHitbox(ctx, world.player.hitbox(HITBOX.PLAYER_VS_BULLET));
     for (const b of world.enemyBullets) drawBullet(ctx, b);

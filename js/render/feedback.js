@@ -50,6 +50,13 @@ export function bindVisualFeedback(events, { particles, effects }) {
   });
   events.on('mineDestroyed', ({ x, y }) => particles.explosion(x, y, { size: 4, count: 6 }));
   events.on('vaderMode', ({ mode }) => mode === 'charge' && effects.shake(8, 0.4));
+  events.on('portDeflect', ({ x, y }) => particles.sparks(x, y, PAL.mid, 2));
+  events.on('portDestroyed', ({ x, y }) => {
+    particles.explosion(x, y, { size: 40, count: 80, speed: 500 });
+    particles.shockwave(x, y, 900, PAL.white, 1);
+    effects.flash(PAL.white, 0.8);
+    effects.shake(20, 1.5);
+  });
   events.on('superlaser', () => {
     effects.shake(14, 0.6);
     effects.flash(PAL.green, 0.25);

@@ -142,6 +142,12 @@ export class CockpitUI {
       this.set('boss:shielded', m.boss.shielded, (v) => (this.refs.boss.dataset.shielded = v));
     }
 
+    this.show('countdown', Boolean(m.countdown));
+    if (m.countdown) {
+      this.text('countdownTime', m.countdown.time);
+      this.set('countdown:urgent', m.countdown.urgent, (v) => (this.refs.countdown.dataset.urgent = v));
+    }
+
     this.show('wave', Boolean(m.wave));
     if (m.wave) {
       this.meter('waveFill', m.wave.ratio);
@@ -210,6 +216,8 @@ export class CockpitUI {
   // --------------------------------------------------------------- avisos
 
   pushAlert({ text, tone }) {
+    // Sin repetir un aviso que todavía está en pantalla (p. ej. láseres que rebotan en el puerto)
+    if (this.alerts.some((a) => a.el.textContent === text)) return;
     const el = document.createElement('p');
     el.className = 'alert';
     el.dataset.tone = tone;

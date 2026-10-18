@@ -1,6 +1,6 @@
 # X-Wing: Asalto a la Estrella de la Muerte
 
-Shooter espacial en Canvas + JavaScript (ES modules, sin dependencias ni build). Pilota el X-Wing a través de 5 fases: dos oleadas de TIE y tres jefes (TIE Advanced de Vader, Destructor Estelar y la Estrella de la Muerte).
+Shooter espacial en Canvas + JavaScript (ES modules, sin dependencias ni build). Pilota el X-Wing a través de 5 fases: dos oleadas, Darth Vader, el Destructor Estelar y la carrera final por la trinchera de la Estrella de la Muerte.
 
 **Juega aquí:** https://franciscoep.github.io/X-Wing/
 
@@ -26,7 +26,9 @@ Cada nave dispara a su propio ritmo (`sim/ai/weapons.js`). Las formaciones (V, c
 
 El **Destructor Estelar** se desmonta por partes: tres torretas (abanico, ráfaga apuntada y rayo de barrido que marca antes su cono) y un hangar que lanza TIE. Los láseres pasan por encima del casco y solo dañan las partes; cada parte destruida apaga su ataque. Cuando caen las tres torretas, el puente de mando pierde el blindaje: destrúyelo para ganar.
 
-Power-ups que sueltan los enemigos: disparo triple, fuego rápido, escudo, reparación y torpedos extra. En la Estrella de la Muerte solo el **puerto de escape** (círculo amarillo) recibe daño; esquiva el superláser cuando veas la línea verde punteada.
+El final es la **carrera por la trinchera**: al entrar se repara el escudo y recibes 2 torpedos; luego llegan torretas en las paredes (trío de rayos con aviso) y Vader se pone detrás. A los 38 s aparece el puerto de escape: los láseres rebotan, solo un torpedo lo destruye. Si la cuenta de 60 s llega a cero, la Estrella de la Muerte dispara su superláser y pierdes.
+
+Power-ups que sueltan los enemigos: disparo triple, fuego rápido, escudo, reparación y torpedos extra. 
 
 ## Ejecutar en local
 
@@ -46,7 +48,6 @@ Dirección aprobada en el [documento de diseño](https://claude.ai/code/artifact
 - Las naves son **pixel art dibujado por código** (`render/art/pixelArt.js`) con una paleta fija (`render/art/palette.js`), contorno automático de 1 px y versión de destello para los impactos.
 - Explosiones, chispas, láseres y anillos son pixel art; sin desenfoques, brillos ni distorsiones.
 - La interfaz HTML usa la misma cuadrícula (`--px`) y tipografías pixel (Press Start 2P y VT323).
-- Pendiente (paso 5 del plan): la Estrella de la Muerte aún usa el dibujo vectorial anterior; la reemplazará la trinchera.
 
 ## Pruebas
 

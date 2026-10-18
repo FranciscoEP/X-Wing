@@ -79,6 +79,37 @@ export const WEAPON_KINDS = {
   },
 };
 
+// Torreta de la trinchera: carga 0,5 s (resplandor) y suelta tres rayos lentos apuntados.
+WEAPON_KINDS.TRIO = (p) => {
+  let cooldown = rand(p.firstMin, p.firstMax);
+  let chargeLeft = 0;
+  return {
+    kind: 'TRIO',
+    get charge() {
+      return chargeLeft > 0 ? 1 - chargeLeft / p.charge : 0;
+    },
+    update(enemy, dt, world) {
+      if (chargeLeft > 0) {
+        chargeLeft -= dt;
+        if (chargeLeft <= 0 && enemy.canFire(world)) {
+          const speed = BULLET.ENEMY_SPEED * p.speedFactor;
+          const angle = Math.atan2(world.player.cy - enemy.cy, world.player.cx - enemy.cx);
+          for (let i = 0; i < p.count; i++) {
+            const a = angle - p.spread / 2 + (p.spread * i) / (p.count - 1);
+            world.spawnEnemyBullet(new Bullet(enemy.cx, enemy.cy, Math.cos(a) * speed, Math.sin(a) * speed, { damage: BULLET.ENEMY_DAMAGE, friendly: false }));
+          }
+        }
+        return;
+      }
+      cooldown -= dt;
+      if (cooldown <= 0 && enemy.canFire(world)) {
+        chargeLeft = p.charge;
+        cooldown = p.every / enemy.difficulty.enemyFire;
+      }
+    },
+  };
+};
+
 function fireTwin(enemy, world, p) {
   const speed = BULLET.ENEMY_SPEED * p.speedFactor;
   for (const dy of [-p.gap, p.gap]) {

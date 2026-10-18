@@ -22,7 +22,7 @@ describe('integridad de config.js', () => {
           assert.ok(sq.size > 0);
           if (sq.enemy) assert.ok(ENEMY_TYPES[sq.enemy], `enemigo del escuadrón ${sq.enemy}`);
         }
-      } else {
+      } else if (phase.type === PHASE_TYPE.BOSS) {
         assert.ok(BOSS_TYPES[phase.boss], `jefe ${phase.boss}`);
       }
     }
