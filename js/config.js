@@ -44,7 +44,6 @@ export const BULLET = {
   TRIPLE_SPREAD: 0.22, // componente vertical relativa de los disparos laterales
   ENEMY_SPEED: 380,
   ENEMY_DAMAGE: 10,
-  ENEMY_AIM_ERROR: 0.12, // radianes
 };
 
 /**
@@ -78,13 +77,65 @@ export const COMBAT = {
 };
 
 /**
- * aimLead: cuánto anticipa la IA el movimiento del jugador al apuntar (0 = dispara a donde está,
- * 1 = intercepción perfecta). dodge: multiplica la probabilidad de esquivar de cada enemigo.
+ * Palancas de dificultad (todas multiplicadores salvo que se indique):
+ * - lives: naves · dropRate: probabilidad de power-up por derribo
+ * - enemySpeed / enemyFire: velocidad y cadencia de los cazas
+ * - aimLead (0..1): cuánto anticipan tu movimiento al apuntar · aimError: imprecisión en radianes
+ * - bulletSpeed / damage: velocidad y daño de las balas enemigas
+ * - dodge: probabilidad de esquivar (× la de cada caza)
+ * - bossHp / bossPace: vida de los jefes y velocidad de todo su comportamiento (ataques incluidos)
+ * - squadronPace / squadronBonus: frecuencia de escuadrones y naves extra en cada uno
+ * Se calibran con el piloto experto: `npm run balance` (metas en tests/balance.test.js).
  */
 export const DIFFICULTIES = {
-  EASY: { label: 'Piloto Novato', lives: 5, enemySpeed: 0.8, enemyFire: 0.7, bossHp: 0.7, dropRate: 0.25, aimLead: 0.25, dodge: 0.4 },
-  NORMAL: { label: 'Piloto Rebelde', lives: 3, enemySpeed: 1, enemyFire: 1, bossHp: 1, dropRate: 0.15, aimLead: 0.7, dodge: 0.8 },
-  HARD: { label: 'As de la Alianza', lives: 2, enemySpeed: 1.3, enemyFire: 1.4, bossHp: 1.5, dropRate: 0.1, aimLead: 1, dodge: 1 },
+  EASY: {
+    label: 'Piloto Novato',
+    lives: 5,
+    dropRate: 0.25,
+    enemySpeed: 0.8,
+    enemyFire: 0.7,
+    aimLead: 0.25,
+    aimError: 0.16,
+    bulletSpeed: 0.85,
+    damage: 0.8,
+    dodge: 0.4,
+    bossHp: 0.7,
+    bossPace: 0.85,
+    squadronPace: 0.85,
+    squadronBonus: 0,
+  },
+  NORMAL: {
+    label: 'Piloto Rebelde',
+    lives: 3,
+    dropRate: 0.15,
+    enemySpeed: 1,
+    enemyFire: 1.4,
+    aimLead: 0.7,
+    aimError: 0.04,
+    bulletSpeed: 1.15,
+    damage: 1.7,
+    dodge: 0.8,
+    bossHp: 1.1,
+    bossPace: 1.25,
+    squadronPace: 1.25,
+    squadronBonus: 1,
+  },
+  HARD: {
+    label: 'As de la Alianza',
+    lives: 2,
+    dropRate: 0.1,
+    enemySpeed: 1.3,
+    enemyFire: 1.6,
+    aimLead: 1,
+    aimError: 0.03,
+    bulletSpeed: 1.25,
+    damage: 1.8,
+    dodge: 1,
+    bossHp: 1.5,
+    bossPace: 1.3,
+    squadronPace: 1.35,
+    squadronBonus: 1,
+  },
 };
 export const DEFAULT_DIFFICULTY = 'NORMAL';
 
@@ -110,7 +161,7 @@ export const WEAPONS = {
   TWIN: { align: 40, charge: 0.3, gap: 10, cooldownMin: 0.8, cooldownMax: 1.6, speedFactor: 1.1 },
   FAN: { align: 60, count: 3, spread: 0.35, shots: 1 },
   MINES: { every: 2.2, firstMin: 0.6, firstMax: 1.4, minDistance: 120 },
-  TRIO: { every: 2.2, firstMin: 0.4, firstMax: 1.2, charge: 0.5, count: 3, spread: 0.18, speedFactor: 0.7 },
+  TRIO: { every: 1.8, firstMin: 0.4, firstMax: 1.2, charge: 0.5, count: 3, spread: 0.18, speedFactor: 0.75 },
 };
 
 /** Mina del TIE Bomber: flota `lifetime` s y estalla; si te acercas, se arma con `fuse` s de margen. */
@@ -127,7 +178,7 @@ export const BOSS = {
 export const BOSS_TYPES = {
   TIE_ADVANCED: { name: 'TIE Advanced x1 — Darth Vader', hp: 600, score: 3000, width: 80, height: 68 },
   // hp del Destructor: la suma de sus partes (sim/bosses/StarDestroyer.js)
-  STAR_DESTROYER: { name: 'Destructor Estelar clase Imperial', hp: 1070, score: 6000, width: 520, height: 260 },
+  STAR_DESTROYER: { name: 'Destructor Estelar clase Imperial', hp: 830, score: 6000, width: 520, height: 260 },
 };
 
 export const PHASE_TYPE = { WAVE: 'WAVE', BOSS: 'BOSS', TRENCH: 'TRENCH' };
@@ -196,7 +247,7 @@ export const TRENCH = {
   top: 110,
   bottom: 430,
   minPlayerX: 90,
-  turretEvery: 1.5,
+  turretEvery: 1.0,
   turretJitter: 0.5,
   torpedoRefill: 2,
   portScore: 25000,
@@ -206,7 +257,7 @@ export const TRENCH = {
 export const PORT = { width: 36, height: 36, stopXRatio: 0.72, speed: 120 };
 
 /** Vader persiguiendo desde atrás en la trinchera: pares hacia delante con aviso. */
-export const TRENCH_VADER = { x: -36, follow: 1.4, every: 2.4, charge: 0.45, gap: 12, speedFactor: 1.1 };
+export const TRENCH_VADER = { x: -36, follow: 1.6, every: 1.7, charge: 0.45, gap: 12, speedFactor: 1.2 };
 
 // `duration` en segundos = efecto temporal; el resto se aplica al instante (ver sim/powerups.js).
 export const POWERUPS = {

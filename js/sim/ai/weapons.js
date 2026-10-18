@@ -53,10 +53,12 @@ export const WEAPON_KINDS = {
         const crossing = Math.abs(world.player.cy - enemy.cy) < p.align;
         if (!crossing || !enemy.canFire(world)) return;
         shots--;
-        const angle = interceptAngle({ x: enemy.x, y: enemy.cy }, world.player, BULLET.ENEMY_SPEED, enemy.difficulty.aimLead);
+        const d = enemy.difficulty;
+        const speed = BULLET.ENEMY_SPEED * d.bulletSpeed;
+        const angle = interceptAngle({ x: enemy.x, y: enemy.cy }, world.player, speed, d.aimLead) + rand(-d.aimError, d.aimError);
         for (let i = 0; i < p.count; i++) {
           const a = angle - p.spread / 2 + (p.spread * i) / (p.count - 1);
-          world.spawnEnemyBullet(new Bullet(enemy.x, enemy.cy, Math.cos(a) * BULLET.ENEMY_SPEED, Math.sin(a) * BULLET.ENEMY_SPEED, { damage: BULLET.ENEMY_DAMAGE, friendly: false }));
+          world.spawnEnemyBullet(hostile(enemy.x, enemy.cy, a, speed, d));
         }
       },
     };
@@ -92,11 +94,12 @@ WEAPON_KINDS.TRIO = (p) => {
       if (chargeLeft > 0) {
         chargeLeft -= dt;
         if (chargeLeft <= 0 && enemy.canFire(world)) {
-          const speed = BULLET.ENEMY_SPEED * p.speedFactor;
-          const angle = Math.atan2(world.player.cy - enemy.cy, world.player.cx - enemy.cx);
+          const d = enemy.difficulty;
+          const speed = BULLET.ENEMY_SPEED * p.speedFactor * d.bulletSpeed;
+          const angle = Math.atan2(world.player.cy - enemy.cy, world.player.cx - enemy.cx) + rand(-d.aimError, d.aimError);
           for (let i = 0; i < p.count; i++) {
             const a = angle - p.spread / 2 + (p.spread * i) / (p.count - 1);
-            world.spawnEnemyBullet(new Bullet(enemy.cx, enemy.cy, Math.cos(a) * speed, Math.sin(a) * speed, { damage: BULLET.ENEMY_DAMAGE, friendly: false }));
+            world.spawnEnemyBullet(hostile(enemy.cx, enemy.cy, a, speed, d));
           }
         }
         return;
@@ -110,10 +113,16 @@ WEAPON_KINDS.TRIO = (p) => {
   };
 };
 
+/** Bala enemiga con la velocidad y el daño ya ajustados a la dificultad `d`. */
+export function hostile(x, y, angle, speed, d, opts = {}) {
+  return new Bullet(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, { damage: BULLET.ENEMY_DAMAGE * d.damage, friendly: false, ...opts });
+}
+
 function fireTwin(enemy, world, p) {
-  const speed = BULLET.ENEMY_SPEED * p.speedFactor;
+  const speed = BULLET.ENEMY_SPEED * p.speedFactor * enemy.difficulty.bulletSpeed;
+  // Construidos horizontales a propósito: vy exactamente 0 (no apuntan)
   for (const dy of [-p.gap, p.gap]) {
-    world.spawnEnemyBullet(new Bullet(enemy.x, enemy.cy + dy, -speed, 0, { damage: BULLET.ENEMY_DAMAGE, friendly: false }));
+    world.spawnEnemyBullet(new Bullet(enemy.x, enemy.cy + dy, -speed, 0, { damage: BULLET.ENEMY_DAMAGE * enemy.difficulty.damage, friendly: false }));
   }
   world.emit('enemyTwinShot', { enemy });
 }

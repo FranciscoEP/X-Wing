@@ -10,9 +10,12 @@ export const PHASE_STATUS = { IDLE: 'idle', INTRO: 'intro', ACTIVE: 'active', CL
  * Notifica a quien la usa mediante callbacks; no conoce entidades ni render.
  */
 export class PhaseManager {
-  constructor({ onPhaseStart = () => {}, onPhaseClear = () => {}, onVictory = () => {} } = {}, phases = PHASES) {
+  /** `pace` acelera la llegada de escuadrones y `bonus` añade naves a cada uno (dificultad). */
+  constructor({ onPhaseStart = () => {}, onPhaseClear = () => {}, onVictory = () => {} } = {}, phases = PHASES, { pace = 1, bonus = 0 } = {}) {
     this.callbacks = { onPhaseStart, onPhaseClear, onVictory };
     this.phases = phases;
+    this.pace = pace;
+    this.bonus = bonus;
     this.index = -1;
     this.status = PHASE_STATUS.IDLE;
     this.lastClearFlawless = false;
@@ -94,11 +97,12 @@ export class PhaseManager {
     if (!this.isActive || p.type !== PHASE_TYPE.WAVE || this.spawned >= p.count) return null;
     this.spawnTimer -= dt;
     if (this.spawnTimer > 0) return null;
-    this.spawnTimer = p.squadronEvery * rand(1 - INTERVAL_JITTER, 1 + INTERVAL_JITTER);
+    // pace (dificultad) acelera la llegada de escuadrones; bonus añade naves a cada uno
+    this.spawnTimer = (p.squadronEvery / this.pace) * rand(1 - INTERVAL_JITTER, 1 + INTERVAL_JITTER);
     const options = p.squadrons.length > 1 ? p.squadrons.filter((s) => s !== this.lastSquadron) : p.squadrons;
     const spec = weightedChoice(options);
     this.lastSquadron = spec;
-    const size = Math.min(spec.size, p.count - this.spawned);
+    const size = Math.min(spec.size + this.bonus, p.count - this.spawned);
     this.spawned += size;
     // `enemy` (opcional) cambia el tipo de nave de este escuadrón respecto al de la fase
     return { formation: spec.formation, size, enemy: spec.enemy };

@@ -59,7 +59,7 @@ describe('Vader etapa 3: la mira', () => {
     const lock = world.boss.lock;
     assert.ok(Math.abs(lock.y - world.player.cy) > 5, 'no salta al instante');
     run(world, LOCK.TRACK, (w) => (isolate(w), godMode(w), {}), { until: (w) => w.boss.lock.state !== LOCK_STATE.TRACKING });
-    assert.ok(world.stats.time - start >= LOCK.TRACK - 0.25);
+    assert.ok(world.stats.time - start >= LOCK.TRACK / world.difficulty.bossPace - 0.25);
   });
 
   it('si te quedas quieto, la ráfaga te alcanza', () => {
@@ -80,7 +80,7 @@ describe('Vader etapa 3: la mira', () => {
   it('mientras la mira trabaja, no dispara pares (un ataque peligroso a la vez)', () => {
     const world = vader(0.2);
     untilLocked(world);
-    run(world, LOCK.LOCKED * 0.9, (w) => (isolate(w), godMode(w), {}));
+    run(world, (LOCK.LOCKED / world.difficulty.bossPace) * 0.9, (w) => (isolate(w), godMode(w), {}));
     assert.equal(world.enemyBullets.length, 0);
   });
 });

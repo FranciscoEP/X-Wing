@@ -46,7 +46,7 @@ export class World {
       onPhaseStart: (phase) => this.onPhaseStart(phase),
       onPhaseClear: (phase, flawless) => this.onPhaseClear(phase, flawless),
       onVictory: () => this.finish(OUTCOME.VICTORY),
-    });
+    }, undefined, { pace: difficulty.squadronPace, bonus: difficulty.squadronBonus });
   }
 
   start(fromPhase = 0) {
@@ -113,7 +113,7 @@ export class World {
     mine.dead = true;
     this.emit('mineBlast', { x: mine.cx, y: mine.cy, radius: MINE.radius });
     const { player } = this;
-    if (Math.hypot(player.cx - mine.cx, player.cy - mine.cy) < MINE.radius) this.damagePlayer(MINE.damage);
+    if (Math.hypot(player.cx - mine.cx, player.cy - mine.cy) < MINE.radius) this.damagePlayer(MINE.damage * this.difficulty.damage);
   }
 
   /** Un láser o torpedo destruye la mina antes de que estalle (sin daño). */

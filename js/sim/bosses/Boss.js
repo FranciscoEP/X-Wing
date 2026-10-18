@@ -7,7 +7,6 @@ import { Entity } from '../entities/Entity.js';
 export const HIT = { DAMAGE: 'hit', ARMOR: 'armor' };
 
 const HIT_FLASH = 0.06;
-const MAX_FIRE_SPEED_FACTOR = 1.25;
 const DEATH_EXPLOSION_CHANCE = 0.5;
 
 /**
@@ -49,7 +48,8 @@ export class Boss extends Entity {
 
     if (this.dying) return this.updateDeath(dt, world);
     if (this.entering) return this.updateEntry(dt);
-    this.behave(dt, world);
+    // bossPace acelera todo el comportamiento (movimiento y ataques) según la dificultad
+    this.behave(dt * this.difficulty.bossPace, world);
   }
 
   updateEntry(dt) {
@@ -102,9 +102,9 @@ export class Boss extends Entity {
     return false;
   }
 
-  /** Rapidez real de sus balas: la dificultad acelera el fuego hasta un límite. */
+  /** Rapidez real de sus balas según la dificultad. */
   bulletSpeed(speed = BULLET.ENEMY_SPEED) {
-    return speed * Math.min(MAX_FIRE_SPEED_FACTOR, this.difficulty.enemyFire);
+    return speed * this.difficulty.bulletSpeed;
   }
 
   /** Dispara `count` balas repartidas en un abanico de `spread` radianes centrado en `angle`. */
@@ -114,7 +114,7 @@ export class Boss extends Entity {
       const a = count === 1 ? angle : angle - spread / 2 + (spread * i) / (count - 1);
       world.spawnEnemyBullet(
         new Bullet(x, y, Math.cos(a) * s, Math.sin(a) * s, {
-          damage: BULLET.ENEMY_DAMAGE,
+          damage: BULLET.ENEMY_DAMAGE * this.difficulty.damage,
           friendly: false,
           color,
           thickness: size,

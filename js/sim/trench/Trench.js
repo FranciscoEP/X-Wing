@@ -1,7 +1,7 @@
 import { BULLET, CANVAS, PORT, TRENCH, TRENCH_VADER } from '../../config.js';
 import { clamp, rand } from '../../core/utils.js';
 import { scroll } from '../ai/movement.js';
-import { Bullet } from '../entities/Bullet.js';
+import { hostile } from '../ai/weapons.js';
 import { Entity } from '../entities/Entity.js';
 
 /**
@@ -108,9 +108,10 @@ export class TrenchVader {
   }
 
   fire(world) {
-    const speed = BULLET.ENEMY_SPEED * TRENCH_VADER.speedFactor;
+    const d = world.difficulty;
+    const speed = BULLET.ENEMY_SPEED * TRENCH_VADER.speedFactor * d.bulletSpeed;
     for (const dy of [-TRENCH_VADER.gap, TRENCH_VADER.gap]) {
-      world.spawnEnemyBullet(new Bullet(this.x + this.width, this.cy + dy, speed, 0, { damage: BULLET.ENEMY_DAMAGE, friendly: false }));
+      world.spawnEnemyBullet(hostile(this.x + this.width, this.cy + dy, 0, speed, d));
     }
   }
 }

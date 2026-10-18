@@ -1,7 +1,7 @@
-import { BULLET, CANVAS, FORMATION } from '../../config.js';
+import { CANVAS, FORMATION } from '../../config.js';
 import { clamp } from '../../core/utils.js';
 import { interceptAngle } from '../ai/aim.js';
-import { Bullet } from '../entities/Bullet.js';
+import { hostile } from '../ai/weapons.js';
 import { Evasion } from '../ai/evasion.js';
 import { spawnSquadron } from '../ai/formations.js';
 import { Boss, HIT } from './Boss.js';
@@ -201,7 +201,7 @@ export class TieAdvanced extends Boss {
     for (const side of [-1, 1]) {
       const ox = this.x + nx * side * PAIR.GAP;
       const oy = this.cy + ny * side * PAIR.GAP;
-      world.spawnEnemyBullet(new Bullet(ox, oy, Math.cos(angle) * speed, Math.sin(angle) * speed, { damage: BULLET.ENEMY_DAMAGE, friendly: false }));
+      world.spawnEnemyBullet(hostile(ox, oy, angle, speed, this.difficulty));
     }
   }
 
@@ -239,7 +239,7 @@ export class TieAdvanced extends Boss {
   fireAtPoint(world, x, y) {
     const speed = this.bulletSpeed() * LOCK.SPEED_FACTOR;
     const angle = Math.atan2(y - this.cy, x - this.x);
-    world.spawnEnemyBullet(new Bullet(this.x, this.cy, Math.cos(angle) * speed, Math.sin(angle) * speed, { damage: BULLET.ENEMY_DAMAGE, friendly: false, thickness: 4 }));
+    world.spawnEnemyBullet(hostile(this.x, this.cy, angle, speed, this.difficulty, { thickness: 4 }));
   }
 
   /** Con el escudo activo los disparos rebotan. */

@@ -49,6 +49,24 @@ Dirección aprobada en el [documento de diseño](https://claude.ai/code/artifact
 - Explosiones, chispas, láseres y anillos son pixel art; sin desenfoques, brillos ni distorsiones.
 - La interfaz HTML usa la misma cuadrícula (`--px`) y tipografías pixel (Press Start 2P y VT323).
 
+## Balance de dificultad
+
+La dificultad se calibra con un **piloto experto** automático (`js/sim/ai/ExpertPilot.js`) que juega sin trampas: simula la física de la nave, esquiva balas, minas, rayos y la mira de Vader, y usa torpedos. Tiene perfiles de jugador «bueno» y «promedio» con tiempo de reacción, atención limitada, imprecisión y errores ocasionales. Son supuestos razonables, no datos reales de jugadores.
+
+```bash
+npm run balance
+```
+
+juega 30 partidas por dificultad y perfil en unos segundos y muestra victorias, vidas perdidas, daño y en qué fase se pierde. Metas (verificadas en `tests/balance.test.js`):
+
+| Dificultad | Buen piloto | Piloto promedio |
+| --- | --- | --- |
+| Fácil | ≥ 95 % de victorias | ≥ 90 % |
+| Normal | ≥ 80 % | — |
+| Difícil | 5–35 % | ≤ 10 % |
+
+Además, en Difícil la trinchera final debe causar al menos el 20 % de las derrotas: el final es el momento de máxima intensidad. Las palancas están en `DIFFICULTIES` (`config.js`).
+
 ## Pruebas
 
 Sin dependencias: usan el runner nativo de Node (≥ 20).

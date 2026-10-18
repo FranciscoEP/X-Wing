@@ -12,11 +12,11 @@ const DRIFT = { AMPLITUDE: 60, FREQ: 0.4 };
  * `hp` se multiplica por la dificultad (bossHp).
  */
 export const PART = {
-  FAN: { id: 'FAN', label: 'Torreta de abanico', u: 0.32, v: 0.5, w: 40, h: 40, hp: 200, turret: true },
-  BURST: { id: 'BURST', label: 'Torreta de ráfaga', u: 0.58, v: 0.34, w: 40, h: 40, hp: 200, turret: true },
-  BEAM: { id: 'BEAM', label: 'Cañón de barrido', u: 0.58, v: 0.66, w: 40, h: 40, hp: 220, turret: true },
-  HANGAR: { id: 'HANGAR', label: 'Hangar', u: 0.74, v: 0.76, w: 64, h: 30, hp: 150, turret: false },
-  BRIDGE: { id: 'BRIDGE', label: 'Puente de mando', u: 0.86, v: 0.5, w: 64, h: 76, hp: 300, turret: false },
+  FAN: { id: 'FAN', label: 'Torreta de abanico', u: 0.32, v: 0.5, w: 40, h: 40, hp: 150, turret: true },
+  BURST: { id: 'BURST', label: 'Torreta de ráfaga', u: 0.58, v: 0.34, w: 40, h: 40, hp: 150, turret: true },
+  BEAM: { id: 'BEAM', label: 'Cañón de barrido', u: 0.58, v: 0.66, w: 40, h: 40, hp: 170, turret: true },
+  HANGAR: { id: 'HANGAR', label: 'Hangar', u: 0.74, v: 0.76, w: 64, h: 30, hp: 120, turret: false },
+  BRIDGE: { id: 'BRIDGE', label: 'Puente de mando', u: 0.86, v: 0.5, w: 64, h: 76, hp: 240, turret: false },
 };
 
 /** Ataque de cada parte: cada cuánto, cuánto avisa antes y sus parámetros. */
@@ -163,7 +163,7 @@ export class StarDestroyer extends Boss {
     }
     p.charge = 0;
     beam.angle = beam.from + (beam.to - beam.from) * Math.min(1, beam.t / sweep);
-    if (this.beamHits(world.player)) world.damagePlayer(ATTACK.BEAM.damage);
+    if (this.beamHits(world.player)) world.damagePlayer(ATTACK.BEAM.damage * this.difficulty.damage);
     if (beam.t >= sweep) this.beam = null;
   }
 

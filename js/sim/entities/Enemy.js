@@ -70,12 +70,17 @@ export class Enemy extends Entity {
     world.spawnEnemyBullet(this.aimAt(world.player, lead));
   }
 
-  /** Bala hacia donde estará el jugador (según `lead`, por defecto aimLead), con cierta imprecisión. */
+  /**
+   * Bala hacia donde estará el jugador (según `lead`, por defecto aimLead), con la imprecisión,
+   * velocidad y daño de la dificultad.
+   */
   aimAt(target, lead = this.difficulty.aimLead) {
+    const { aimError, bulletSpeed, damage } = this.difficulty;
+    const speed = BULLET.ENEMY_SPEED * bulletSpeed;
     const from = { x: this.x, y: this.cy };
-    const angle = interceptAngle(from, target, BULLET.ENEMY_SPEED, lead) + rand(-BULLET.ENEMY_AIM_ERROR, BULLET.ENEMY_AIM_ERROR);
-    return new Bullet(from.x, from.y, Math.cos(angle) * BULLET.ENEMY_SPEED, Math.sin(angle) * BULLET.ENEMY_SPEED, {
-      damage: BULLET.ENEMY_DAMAGE,
+    const angle = interceptAngle(from, target, speed, lead) + rand(-aimError, aimError);
+    return new Bullet(from.x, from.y, Math.cos(angle) * speed, Math.sin(angle) * speed, {
+      damage: BULLET.ENEMY_DAMAGE * damage,
       friendly: false,
     });
   }
