@@ -17,7 +17,7 @@ function autopilot(world) {
   const { player, boss } = world;
   let targetY = player.cy;
   if (boss?.vulnerable) {
-    targetY = boss.type === 'DEATH_STAR' ? centerOf(boss.port).y : boss.cy;
+    targetY = boss.targetPoint.y;
   } else {
     const ahead = world.enemies.filter((e) => !e.dead && e.x > player.x).sort((a, b) => a.x - b.x)[0];
     if (ahead) targetY = ahead.cy;

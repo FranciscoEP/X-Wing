@@ -123,7 +123,8 @@ export const BOSS = {
 
 export const BOSS_TYPES = {
   TIE_ADVANCED: { name: 'TIE Advanced x1 — Darth Vader', hp: 600, score: 3000, width: 80, height: 68 },
-  STAR_DESTROYER: { name: 'Destructor Estelar clase Imperial', hp: 1200, score: 6000, width: 400, height: 190 },
+  // hp del Destructor: la suma de sus partes (sim/bosses/StarDestroyer.js)
+  STAR_DESTROYER: { name: 'Destructor Estelar clase Imperial', hp: 1070, score: 6000, width: 520, height: 260 },
   DEATH_STAR: { name: 'Estrella de la Muerte', hp: 700, score: 15000, width: 420, height: 420 },
 };
 
@@ -167,7 +168,7 @@ export const PHASES = [
       { formation: FORMATION.STRAFE, size: 2, enemy: 'TIE_FIGHTER', weight: 1 },
     ],
   },
-  { type: PHASE_TYPE.BOSS, name: 'Destructor Estelar', objective: 'Destruye el Star Destroyer', boss: 'STAR_DESTROYER' },
+  { type: PHASE_TYPE.BOSS, name: 'Destructor Estelar', objective: 'Destruye sus torretas y luego el puente', boss: 'STAR_DESTROYER' },
   { type: PHASE_TYPE.BOSS, name: 'Estrella de la Muerte', objective: 'Dispara al puerto de escape', boss: 'DEATH_STAR' },
 ];
 

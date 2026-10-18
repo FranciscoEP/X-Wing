@@ -1,11 +1,12 @@
 import { rand } from '../core/utils.js';
 import { LASER, LASER_STATE, RADIUS } from '../sim/bosses/DeathStar.js';
-import { TURRETS } from '../sim/bosses/StarDestroyer.js';
+import { ATTACK } from '../sim/bosses/StarDestroyer.js';
+import { paintStarDestroyerHull } from './art/starDestroyer.js';
 import { LOCK_STATE, PAIR, VADER_MODE } from '../sim/bosses/TieAdvanced.js';
 import { RENDER } from '../config.js';
 import { PAL } from './art/palette.js';
 import { drawSprite } from './art/SpriteCache.js';
-import { px, rect, ring } from './pixel.js';
+import { circle, line, px, rect, ring } from './pixel.js';
 
 const HIT_FLASH = 'rgba(255, 255, 255, 0.35)';
 
@@ -17,7 +18,7 @@ const HIT_FLASH = 'rgba(255, 255, 255, 0.35)';
 export const BOSS_RENDERERS = {
   TIE_ADVANCED: { body: drawTieAdvanced, overlay: drawVaderOverlay, pixel: true },
   // Provisionales: vectores escalados al búfer. Se rehacen en pixel art en los pasos 4 y 5.
-  STAR_DESTROYER: { body: drawStarDestroyer },
+  STAR_DESTROYER: { body: drawStarDestroyer, overlay: drawSweepBeam, pixel: true },
   DEATH_STAR: { body: drawDeathStar, overlay: drawSuperlaser },
 };
 
@@ -101,68 +102,89 @@ function drawVaderOverlay(ctx, boss, { time }) {
   if (boss.shielded) ring(ctx, px(boss.cx), px(boss.cy), 0, PAL.redHi, { rx: 28, ry: 24, dash: Math.floor(time * 8) % 2 ? 2 : 3 });
 }
 
+// ------------------------------------------------------------------ Destructor Estelar
+
+let sdHull = null; // casco precalculado (se pinta una sola vez)
+
 function drawStarDestroyer(ctx, boss, { time, flash }) {
-  const { x, y, width: w, height: h } = boss;
-  const grad = ctx.createLinearGradient(x, y, x, y + h);
-  grad.addColorStop(0, '#c9ced6');
-  grad.addColorStop(0.5, '#8a929e');
-  grad.addColorStop(1, '#4b525c');
+  const w = px(boss.width);
+  const h = px(boss.height);
+  sdHull ??= paintStarDestroyerHull(w, h);
+  const x = px(boss.x);
+  const y = px(boss.y);
+  ctx.drawImage(sdHull, x - 1, y - 1);
 
-  // Casco
-  ctx.fillStyle = grad;
-  ctx.strokeStyle = '#2b3038';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x, y + h / 2);
-  ctx.lineTo(x + w, y);
-  ctx.lineTo(x + w, y + h);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  if (flash) {
-    ctx.fillStyle = HIT_FLASH;
-    ctx.fill();
+  // Toberas: parpadeo azul
+  const glow = Math.floor(time * 10) % 2 ? PAL.cyan : PAL.glass;
+  for (const v of [0.3, 0.5, 0.7]) rect(ctx, x + w, y + Math.round(v * h) - 3, 3, 6, glow);
+
+  for (const part of boss.parts) drawPart(ctx, boss, part, time, flash);
+}
+
+/** Cada parte según su estado: intacta, avisando (parpadea), blindada (puente) o destruida. */
+function drawPart(ctx, boss, part, time) {
+  const r = boss.rectOf(part);
+  const x = px(r.x);
+  const y = px(r.y);
+  const w = px(r.width);
+  const h = px(r.height);
+  const cx = x + Math.floor(w / 2);
+  const cy = y + Math.floor(h / 2);
+
+  if (part.destroyed) {
+    // Restos humeantes
+    rect(ctx, x + 2, y + 2, w - 4, h - 4, PAL.ink);
+    if (Math.floor(time * 6 + cx) % 3 === 0) rect(ctx, cx - 1, cy - 1, 2, 2, PAL.orange);
+    rect(ctx, cx + 2, cy - 3, 1, 1, PAL.dark);
+    return;
   }
+  const hit = part.hitFlash > 0;
+  const warn = part.charge > 0 && Math.floor(time * (10 + part.charge * 20)) % 2 === 0;
 
-  // Línea central y paneles
-  ctx.strokeStyle = 'rgba(40, 45, 55, 0.7)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(x + 10, y + h / 2);
-  ctx.lineTo(x + w, y + h / 2);
-  for (let i = 1; i < 6; i++) {
-    const px = x + (w * i) / 6;
-    const span = (i / 6) * (h / 2);
-    ctx.moveTo(px, y + h / 2 - span);
-    ctx.lineTo(px, y + h / 2 + span);
+  if (part.id === 'BRIDGE') {
+    const armored = !boss.bridgeExposed;
+    rect(ctx, x, y, w, h, PAL.outline);
+    rect(ctx, x + 1, y + 1, w - 2, h - 2, hit ? PAL.white : armored ? PAL.dark : PAL.imperial);
+    rect(ctx, x + 4, y + 6, w - 8, 3, armored ? PAL.ink : PAL.yellow); // ventanal del puente
+    // Generadores de escudo: azules mientras está blindado
+    for (const dx of [5, w - 8]) circle(ctx, x + dx + 1, y - 2, 2, armored ? PAL.cyan : PAL.dark);
+    if (warn) rect(ctx, x - 2, cy - 1, 2, 3, PAL.redHi);
+    return;
   }
-  ctx.stroke();
-
-  // Torre de mando
-  ctx.fillStyle = '#9aa1ab';
-  ctx.fillRect(x + w * 0.78, y + h / 2 - 22, 50, 44);
-  ctx.fillStyle = '#6b727c';
-  ctx.fillRect(x + w * 0.84, y + h / 2 - 36, 26, 72);
-
-  // Motores
-  const glow = 0.6 + Math.sin(time * 10) * 0.2;
-  ctx.fillStyle = `rgba(120, 190, 255, ${glow})`;
-  ctx.shadowColor = '#78beff';
-  ctx.shadowBlur = 20;
-  for (const v of [0.25, 0.5, 0.75]) {
-    ctx.beginPath();
-    ctx.arc(x + w + 4, y + v * h, 9, 0, Math.PI * 2);
-    ctx.fill();
+  if (part.id === 'HANGAR') {
+    rect(ctx, x, y, w, h, PAL.outline);
+    rect(ctx, x + 1, y + 1, w - 2, h - 2, hit ? PAL.white : PAL.dark);
+    // Compuerta: se abre (amarilla) al lanzar un TIE
+    rect(ctx, x + 4, y + 4, w - 8, h - 8, warn ? PAL.yellow : PAL.ink);
+    return;
   }
-  ctx.shadowBlur = 0;
+  // Torretas: base, cañón y luz de aviso
+  circle(ctx, cx, cy, Math.floor(w / 2), PAL.outline);
+  circle(ctx, cx, cy, Math.floor(w / 2) - 1, hit ? PAL.white : PAL.imperialDk);
+  rect(ctx, cx - Math.floor(w / 2) - 4, cy - 1, 6, 2, PAL.mid);
+  rect(ctx, cx - 1, cy - 1, 3, 3, warn ? PAL.white : PAL.red);
+}
 
-  // Torretas
-  ctx.fillStyle = '#ff5050';
-  for (const t of TURRETS) {
-    ctx.beginPath();
-    ctx.arc(x + t.u * w, y + t.v * h, 4, 0, Math.PI * 2);
-    ctx.fill();
+/** Aviso y rayo del cañón de barrido, por encima del jugador. */
+function drawSweepBeam(ctx, boss, { time }) {
+  const beam = boss.beam;
+  if (!beam || boss.dying) return;
+  const o = boss.beamOrigin;
+  const ox = px(o.x);
+  const oy = px(o.y);
+  const len = px(ATTACK.BEAM.length);
+  if (beam.phase === 'charge') {
+    // El cono que va a barrer, con sus dos bordes punteados
+    if (Math.floor(time * 14) % 2) return;
+    for (const a of [beam.from, beam.to]) {
+      for (let i = 8; i < len; i += 5) rect(ctx, ox + Math.cos(a) * i, oy + Math.sin(a) * i, 2, 1, PAL.red);
+    }
+    return;
   }
+  const dx = Math.cos(beam.angle);
+  const dy = Math.sin(beam.angle);
+  line(ctx, ox, oy, ox + dx * len, oy + dy * len, PAL.red, 4);
+  line(ctx, ox, oy + 1, ox + dx * len, oy + dy * len + 1, PAL.white, 2);
 }
 
 function drawDeathStar(ctx, boss, { time, flash }) {

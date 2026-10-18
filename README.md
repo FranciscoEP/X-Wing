@@ -24,6 +24,8 @@ Shooter espacial en Canvas + JavaScript (ES modules, sin dependencias ni build).
 
 Cada nave dispara a su propio ritmo (`sim/ai/weapons.js`). Las formaciones (V, columna, tenaza, escalón, hostigamiento, pasada) y la ruptura al caer el líder siguen en `sim/ai/`. Darth Vader tiene tres etapas: 1) te persigue y dispara pares rápidos (sus cañones brillan antes); 2) además embiste tras una franja roja de aviso; 3) suma escudo, dos escoltas y una mira que te sigue 1,5 s, se fija y dispara una ráfaga a ese punto: muévete en cuanto se ponga blanca.
 
+El **Destructor Estelar** se desmonta por partes: tres torretas (abanico, ráfaga apuntada y rayo de barrido que marca antes su cono) y un hangar que lanza TIE. Los láseres pasan por encima del casco y solo dañan las partes; cada parte destruida apaga su ataque. Cuando caen las tres torretas, el puente de mando pierde el blindaje: destrúyelo para ganar.
+
 Power-ups que sueltan los enemigos: disparo triple, fuego rápido, escudo, reparación y torpedos extra. En la Estrella de la Muerte solo el **puerto de escape** (círculo amarillo) recibe daño; esquiva el superláser cuando veas la línea verde punteada.
 
 ## Ejecutar en local
@@ -44,7 +46,7 @@ Dirección aprobada en el [documento de diseño](https://claude.ai/code/artifact
 - Las naves son **pixel art dibujado por código** (`render/art/pixelArt.js`) con una paleta fija (`render/art/palette.js`), contorno automático de 1 px y versión de destello para los impactos.
 - Explosiones, chispas, láseres y anillos son pixel art; sin desenfoques, brillos ni distorsiones.
 - La interfaz HTML usa la misma cuadrícula (`--px`) y tipografías pixel (Press Start 2P y VT323).
-- Pendiente (pasos 4 y 5 del plan): el Destructor Estelar y la trinchera aún usan el dibujo vectorial anterior.
+- Pendiente (paso 5 del plan): la Estrella de la Muerte aún usa el dibujo vectorial anterior; la reemplazará la trinchera.
 
 ## Pruebas
 

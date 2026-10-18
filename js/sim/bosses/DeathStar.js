@@ -36,6 +36,10 @@ export class DeathStar extends Boss {
     };
   }
 
+  get targetPoint() {
+    return centerOf(this.port);
+  }
+
   /** Centro del plato del superláser. */
   get dish() {
     return { x: this.cx + RADIUS * DISH.DX, y: this.cy + RADIUS * DISH.DY };

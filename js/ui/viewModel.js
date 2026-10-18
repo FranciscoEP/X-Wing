@@ -109,6 +109,8 @@ export const ALERTS = {
   bossStage: ({ stage }) => ({ text: stage.label, tone: 'danger' }),
   vaderMode: ({ mode }) => (mode === 'windup' ? { text: '¡Embestida! Sal de la franja roja', tone: 'danger' } : null),
   vaderLock: () => ({ text: 'Vader te tiene en la mira', tone: 'danger' }),
+  bossPartDestroyed: ({ part }) => ({ text: `${part.cfg.label}: destruida`, tone: 'info' }),
+  bridgeExposed: () => ({ text: '¡Puente expuesto! Dispara al puente', tone: 'warning' }),
   powerUpCollected: ({ cfg }) => ({ text: `${cfg.label} activado`, tone: 'info' }),
   playerDestroyed: ({ livesLeft }) => ({ text: livesLeft > 0 ? `Nave perdida · quedan ${livesLeft}` : 'Sin naves', tone: 'danger' }),
   phaseStart: ({ phase }) => (phase.type === PHASE_TYPE.BOSS ? { text: `Contacto: ${phase.name}`, tone: 'warning' } : null),

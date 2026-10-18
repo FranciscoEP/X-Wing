@@ -20,7 +20,7 @@ export const OUTCOME = { VICTORY: 'victory', DEFEAT: 'defeat' };
  * Eventos: shot, enemyHit, enemyDestroyed, enemyEscaped, bossHit, armorHit, bossDying,
  * bossDestroyed, explosion, shieldBlock, playerHit, playerDestroyed, playerRespawn,
  * powerUpCollected, torpedoLaunched, torpedoBlast, superlaser, enemyDodge, enemyDive, squadronBroken,
- * mineDropped, mineArmed, mineBlast, mineDestroyed, enemyCharge, enemyTwinShot, enemyPass, bossStage, scored, phaseStart, phaseClear, gameOver.
+ * bossPartDestroyed, bridgeExposed, beamCharge, hangarLaunch, mineDropped, mineArmed, mineBlast, mineDestroyed, enemyCharge, enemyTwinShot, enemyPass, bossStage, scored, phaseStart, phaseClear, gameOver.
  */
 export class World {
   constructor({ difficulty, events = new EventBus() }) {
@@ -173,7 +173,7 @@ export class World {
     for (const e of this.enemies) {
       if (!e.dead && distance(center, centerOf(e)) <= TORPEDO.BLAST_RADIUS) this.hitEnemy(e, TORPEDO.ENEMY_DAMAGE);
     }
-    if (directBossHit && this.boss?.vulnerable) this.hitBoss(TORPEDO.BOSS_DAMAGE);
+    if (directBossHit && this.boss?.vulnerable) this.hitBoss(TORPEDO.BOSS_DAMAGE, torpedo);
   }
 
   hitEnemy(enemy, damage) {
@@ -186,9 +186,12 @@ export class World {
     }
   }
 
-  hitBoss(damage) {
+  /** `source` (el proyectil) permite a los jefes por partes saber qué parte recibió el golpe. */
+  hitBoss(damage, source = null) {
     const { boss } = this;
-    if (!boss.takeDamage(damage)) return;
+    const dying = boss.takeDamage(damage, source);
+    this.announceDestroyedParts(boss);
+    if (!dying) return;
     this.addScore(boss.score, { x: boss.cx, y: boss.cy });
     this.enemyBullets.length = 0;
     this.emit('bossDying', { boss });
@@ -202,6 +205,22 @@ export class World {
   /** Precisión 0..1 de los láseres del jugador. */
   get accuracy() {
     return this.stats.shotsFired ? this.stats.shotsHit / this.stats.shotsFired : 0;
+  }
+
+  /** Jefes por partes: anuncia y puntúa cada parte destruida (una vez) y el puente expuesto. */
+  announceDestroyedParts(boss) {
+    if (!boss.parts) return;
+    for (const part of boss.parts) {
+      if (!part.destroyed || part.announced) continue;
+      part.announced = true;
+      const at = centerOf(boss.rectOf(part));
+      this.emit('bossPartDestroyed', { boss, part, ...at });
+      this.addScore(boss.partScore, at);
+    }
+    if (boss.bridgeExposed && !boss.bridgeAnnounced) {
+      boss.bridgeAnnounced = true;
+      this.emit('bridgeExposed', { boss });
+    }
   }
 
   collectPowerUp(powerUp) {

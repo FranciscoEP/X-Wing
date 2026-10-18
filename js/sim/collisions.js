@@ -67,7 +67,7 @@ function playerBulletsVsBoss(world) {
     } else {
       world.recordHit();
       world.emit('bossHit', { x: bullet.cx, y: bullet.cy });
-      world.hitBoss(bullet.damage);
+      world.hitBoss(bullet.damage, bullet);
     }
   }
 }

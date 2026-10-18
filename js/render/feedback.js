@@ -38,6 +38,11 @@ export function bindVisualFeedback(events, { particles, effects }) {
   });
   events.on('squadronBroken', ({ x, y, divers }) => divers && particles.text(x, y - 20, '¡ROMPEN FILAS!', PAL.orange));
   events.on('enemyDodge', ({ enemy }) => particles.sparks(enemy.x + enemy.width, enemy.cy, PAL.glass, 2));
+  events.on('bossPartDestroyed', ({ x, y }) => {
+    particles.explosion(x, y, { size: 14, count: 20, speed: 300 });
+    effects.shake(10, 0.4);
+  });
+  events.on('bridgeExposed', () => effects.flash(PAL.yellow, 0.2));
   events.on('mineBlast', ({ x, y, radius }) => {
     particles.explosion(x, y, { size: 12, count: 16 });
     particles.shockwave(x, y, radius, PAL.orange, 0.3);

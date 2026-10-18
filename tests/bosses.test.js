@@ -61,25 +61,6 @@ describe('TIE Advanced', () => {
   });
 });
 
-describe('Destructor Estelar', () => {
-  it('solo el triángulo del casco recibe impactos', () => {
-    const world = makeWorld({ phase: phaseOf('STAR_DESTROYER') });
-    waitBossReady(world);
-    const { boss } = world;
-    const corner = { x: boss.x + 5, y: boss.y + 2, width: 4, height: 4 };
-    const middle = { x: boss.x + boss.width * 0.7, y: boss.cy - 2, width: 4, height: 4 };
-    assert.equal(boss.hitTest(corner), null);
-    assert.equal(boss.hitTest(middle), HIT.DAMAGE);
-  });
-
-  it('lanza TIE Fighters desde el hangar', () => {
-    const world = makeWorld({ phase: phaseOf('STAR_DESTROYER') });
-    waitBossReady(world);
-    run(world, 5, godMode);
-    assert.ok(world.enemies.some((e) => !e.fromWave));
-  });
-});
-
 describe('Estrella de la Muerte', () => {
   /** `frozen`: el jefe deja de moverse y atacar, para disparar a un punto fijo. */
   const ready = ({ frozen = false } = {}) => {

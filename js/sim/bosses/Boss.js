@@ -73,6 +73,11 @@ export class Boss extends Entity {
 
   behave() {}
 
+  /** Punto al que conviene apuntar (pilotos automáticos y pruebas). */
+  get targetPoint() {
+    return { x: this.cx, y: this.cy };
+  }
+
   /** HIT.DAMAGE si `rect` daña al jefe, HIT.ARMOR si rebota, null si no toca. */
   hitTest(rect) {
     return overlaps(rect, this) ? HIT.DAMAGE : null;
