@@ -1,0 +1,22 @@
+/** Paleta fija de 16 bits compartida por sprites, efectos e interfaz (css/style.css usa los mismos). */
+export const PAL = {
+  outline: '#0b0d14',
+  ink: '#1a1d28',
+  white: '#f2f0e6',
+  light: '#c9ccd6',
+  mid: '#8b92a5',
+  dark: '#525a6e',
+  red: '#d93a3a',
+  redHi: '#ff7a6a',
+  blue: '#3d7be0',
+  glass: '#9fdcff',
+  glassDk: '#2b4a6e',
+  orange: '#ff9a3c',
+  yellow: '#ffe066',
+  green: '#5dff6a',
+  cyan: '#5ce1ff',
+  panel: '#2a2f3d',
+  imperial: '#9aa3b5',
+  imperialDk: '#5d6577',
+  window: '#ff5a3c',
+};

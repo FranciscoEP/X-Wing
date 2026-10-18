@@ -1,69 +1,84 @@
-import { CANVAS } from '../config.js';
-import { rand } from '../core/utils.js';
+import { RENDER } from '../config.js';
+import { seeded } from '../core/random.js';
+import { PAL } from './art/palette.js';
 
-const LAYERS = [
-  { count: 70, speed: 20, size: 1, alpha: 0.4 },
-  { count: 40, speed: 60, size: 1.5, alpha: 0.7 },
-  { count: 15, speed: 140, size: 2, alpha: 1 },
+const STAR_LAYERS = [
+  { count: 60, speed: 6, color: PAL.dark },
+  { count: 35, speed: 20, color: PAL.mid },
+  { count: 14, speed: 55, color: PAL.white },
 ];
 
-/** Imagen de fondo con scroll lento + campo de estrellas en paralaje. */
+/**
+ * Fondo pixel: la imagen del juego (cielo y superficie del planeta) reducida una sola vez al
+ * búfer de 480×270, en mosaicos espejados que se desplazan, más estrellas de 1 px en paralaje.
+ * Las estrellas usan su propio generador con semilla: no consumen el azar de la simulación.
+ */
 export class Background {
-  constructor(image) {
-    this.image = image;
-    this.offset = 0;
-    this.speedMultiplier = 1;
-    this.stars = LAYERS.flatMap((layer) =>
-      Array.from({ length: layer.count }, () => ({ x: rand(0, CANVAS.WIDTH), y: rand(0, CANVAS.HEIGHT), ...layer }))
+  constructor(image, createCanvas = defaultCreateCanvas) {
+    this.tile = image ? prerender(image, createCanvas) : null;
+    const rnd = seeded(1977);
+    this.stars = STAR_LAYERS.flatMap((layer) =>
+      Array.from({ length: layer.count }, () => ({ x: rnd() * RENDER.WIDTH, y: Math.floor(rnd() * RENDER.HEIGHT * 0.75), twinkle: rnd() * 6, ...layer }))
     );
+    this.offset = 0;
+    this.time = 0;
+    this.speedMultiplier = 1;
   }
 
   update(dt) {
-    this.offset += 15 * this.speedMultiplier * dt;
-    for (const star of this.stars) {
-      star.x -= star.speed * this.speedMultiplier * dt;
-      if (star.x < 0) {
-        star.x += CANVAS.WIDTH;
-        star.y = rand(0, CANVAS.HEIGHT);
-      }
+    this.time += dt;
+    const k = this.speedMultiplier;
+    this.offset += 4 * k * dt;
+    for (const s of this.stars) {
+      s.x -= s.speed * k * dt;
+      if (s.x < 0) s.x += RENDER.WIDTH;
     }
   }
 
   draw(ctx) {
-    ctx.fillStyle = '#02030a';
-    ctx.fillRect(0, 0, CANVAS.WIDTH, CANVAS.HEIGHT);
-
-    if (this.image) {
-      // Mosaicos alternados en espejo para que no se note la unión entre copias
-      const h = CANVAS.HEIGHT;
-      const w = (this.image.width / this.image.height) * h;
-      const first = Math.floor(this.offset / w);
-      const img = this.image;
-      // Se solapa 1px y se dibuja opaco para que no aparezca una línea en la unión
-      const tile = (x) => ctx.drawImage(img, x, 0, w + 1, h);
-      ctx.save();
-      for (let i = first; i <= first + 1; i++) {
-        const x = i * w - this.offset;
-        if (i % 2 === 0) {
-          tile(x);
-        } else {
-          ctx.save();
-          ctx.translate(x + w, 0);
-          ctx.scale(-1, 1);
-          tile(0);
-          ctx.restore();
-        }
+    const { WIDTH: W, HEIGHT: H } = RENDER;
+    ctx.fillStyle = '#04060f';
+    ctx.fillRect(0, 0, W, H);
+    if (this.tile) {
+      const tw = this.tile.width;
+      const shift = Math.floor(this.offset) % (tw * 2);
+      for (let x = -shift; x < W; x += tw) {
+        const mirrored = Math.round((x + shift) / tw) % 2 === 1;
+        ctx.drawImage(mirrored ? this.tile.mirror : this.tile, x, 0);
       }
-      ctx.restore();
-      ctx.fillStyle = 'rgba(2, 3, 10, 0.45)';
-      ctx.fillRect(0, 0, CANVAS.WIDTH, CANVAS.HEIGHT);
     }
-
-    for (const star of this.stars) {
-      ctx.globalAlpha = star.alpha;
-      ctx.fillStyle = '#cfe8ff';
-      ctx.fillRect(star.x, star.y, star.size * (1 + this.speedMultiplier * 0.5), star.size);
+    for (const s of this.stars) {
+      const bright = s.speed > 40 && Math.sin(this.time * 3 + s.twinkle) > 0.6;
+      ctx.fillStyle = bright ? PAL.yellow : s.color;
+      ctx.fillRect(Math.floor(s.x), s.y, s.speed > 40 ? 2 : 1, 1);
     }
-    ctx.globalAlpha = 1;
   }
+}
+
+/** Reduce la imagen al alto del búfer con calidad alta (una vez) y prepara su versión espejo. */
+function prerender(image, createCanvas) {
+  const h = RENDER.HEIGHT;
+  const w = Math.round((image.width / image.height) * h);
+  const tile = createCanvas(w, h);
+  const ctx = tile.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(image, 0, 0, w, h);
+  // Oscurece para que las naves destaquen
+  ctx.fillStyle = 'rgba(4, 6, 15, 0.45)';
+  ctx.fillRect(0, 0, w, h);
+  const mirror = createCanvas(w, h);
+  const mctx = mirror.getContext('2d');
+  mctx.translate(w, 0);
+  mctx.scale(-1, 1);
+  mctx.drawImage(tile, 0, 0);
+  tile.mirror = mirror;
+  return tile;
+}
+
+function defaultCreateCanvas(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
 }

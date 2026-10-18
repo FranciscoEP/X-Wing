@@ -1,126 +1,76 @@
 import { POWERUP_ITEM } from '../config.js';
 import { rand } from '../core/utils.js';
-import { FONT } from '../ui/theme.js';
+import { PAL } from './art/palette.js';
+import { XWING_ENGINES } from './art/pixelArt.js';
 import { drawSprite } from './art/SpriteCache.js';
+import { circle, line, px, rect, ring, text } from './pixel.js';
 
-// Sin shadowBlur por frame: el brillo lo aporta el bloom de render/post (o queda plano sin WebGL).
+// Todas las posiciones de la simulación se pasan a píxeles del búfer con `px` antes de dibujar.
 
-const ENGINE_COLOR = '#ff8c3c';
-const SHIELD_COLOR = '#5ce1ff';
-const ENGINE_OFFSETS = [-12, 12]; // px desde el centro, en las toberas del sprite
+const LASER = { friendly: PAL.red, hostile: PAL.green };
+const POWERUP_ICONS = { TRIPLE_SHOT: 'T', RAPID_FIRE: 'R', SHIELD: 'S', REPAIR: '+', TORPEDO: 'B' };
 
-const LASER_COLORS = { friendly: '#ff4a4a', hostile: '#4dff6a' };
-
+/** Rayo de 2 px de grosor; la punta delantera es blanca. */
 export function drawBullet(ctx, b) {
-  const color = b.color ?? (b.friendly ? LASER_COLORS.friendly : LASER_COLORS.hostile);
-  ctx.save();
-  ctx.translate(b.cx, b.cy);
-  ctx.rotate(Math.atan2(b.vy, b.vx));
-  ctx.fillStyle = color;
-  ctx.globalAlpha = 0.35;
-  ctx.fillRect(-b.length / 2 - 2, -b.thickness, b.length + 4, b.thickness * 2);
-  ctx.globalAlpha = 1;
-  ctx.fillRect(-b.length / 2, -b.thickness / 2, b.length, b.thickness);
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(-b.length / 2 + 2, -b.thickness / 4, b.length - 4, b.thickness / 2);
-  ctx.restore();
+  const color = b.color ?? (b.friendly ? LASER.friendly : LASER.hostile);
+  const speed = Math.hypot(b.vx, b.vy) || 1;
+  const dx = b.vx / speed;
+  const dy = b.vy / speed;
+  const len = Math.max(3, px(b.length));
+  const cx = px(b.cx);
+  const cy = px(b.cy);
+  const x0 = cx - (dx * len) / 2;
+  const y0 = cy - (dy * len) / 2;
+  const x1 = cx + (dx * len) / 2;
+  const y1 = cy + (dy * len) / 2;
+  const size = b.thickness > 3 ? 3 : 2;
+  line(ctx, x0, y0, x1, y1, color, size);
+  rect(ctx, x1 - (dx > 0 ? 1 : 0), y1, 2, size, PAL.white);
 }
 
-/** Fuego de tobera: degradado radial aditivo, más largo cuanto más rápido avanza la nave. */
-function engineFlame(ctx, x, y, length, radius, color) {
-  const g = ctx.createRadialGradient(x, y, 0, x, y, length);
-  g.addColorStop(0, '#ffffff');
-  g.addColorStop(0.25, color);
-  g.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.ellipse(x - length * 0.4, y, length, radius, 0, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-/** `sprites`: SpriteCache. */
 export function drawPlayer(ctx, player, sprites, time) {
   if (player.dead) return;
   if (player.invulnerable > 0 && Math.floor(time * 12) % 2 === 0) return;
+  const cx = px(player.cx);
+  const cy = px(player.cy);
 
-  ctx.save();
-  ctx.translate(player.cx, player.cy);
-  ctx.rotate(player.tilt * 0.15);
-
-  // Toberas: más largas cuanto más rápido avanza la nave
-  ctx.globalCompositeOperation = 'lighter';
-  const thrust = 10 + Math.max(0, player.vx) / 40 + rand(0, 3);
-  for (const dy of ENGINE_OFFSETS) engineFlame(ctx, -player.width / 2 + 2, dy, thrust, 4, ENGINE_COLOR);
-  ctx.globalCompositeOperation = 'source-over';
-
-  drawSprite(ctx, sprites.player, 0, 0);
+  // Fuego de toberas: 2–4 px que parpadean, más largos al acelerar
+  const flame = 2 + Math.round(Math.max(0, player.vx) / 120) + (rand(0, 1) < 0.5 ? 1 : 0);
+  for (const [ex, ey] of XWING_ENGINES) {
+    rect(ctx, cx + ex - flame, cy + ey, flame, 2, PAL.orange);
+    rect(ctx, cx + ex - 1, cy + ey, 1, 2, PAL.yellow);
+  }
+  drawSprite(ctx, sprites.player, cx, cy);
 
   if (player.shielded) {
     const left = player.powerUps.SHIELD;
-    ctx.globalAlpha = left < 1.5 ? 0.35 + 0.3 * Math.sin(time * 20) : 0.5;
-    ctx.strokeStyle = SHIELD_COLOR;
-    ctx.fillStyle = 'rgba(92, 225, 255, 0.12)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, player.width * 0.68, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    if (left > 1.5 || Math.floor(time * 10) % 2) ring(ctx, cx, cy, 0, PAL.cyan, { rx: 22, ry: 15, dash: 2 });
   }
-  ctx.restore();
+}
+
+/** Zona vulnerable visible en modo foco (o al depurar). */
+export function drawHitbox(ctx, box) {
+  rect(ctx, px(box.x), px(box.y), Math.max(1, px(box.width)), Math.max(1, px(box.height)), PAL.white);
 }
 
 export function drawEnemy(ctx, enemy, sprites) {
-  const sprite = sprites.enemies[enemy.type];
-  drawSprite(ctx, sprite, enemy.cx, enemy.cy, { flash: enemy.hitFlash > 0 });
+  drawSprite(ctx, sprites.enemies[enemy.type], px(enemy.cx), px(enemy.cy), { flash: enemy.hitFlash > 0 });
 }
 
 export function drawPowerUp(ctx, p) {
-  // Parpadea durante sus últimos segundos
   if (p.timeLeft < POWERUP_ITEM.BLINK_BEFORE_END && Math.floor(p.age * 8) % 2 === 0) return;
-  const r = p.width / 2;
-  const { color, icon } = p.cfg;
-  ctx.save();
-  ctx.translate(p.cx, p.cy);
-  ctx.fillStyle = 'rgba(6, 12, 28, 0.9)';
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.rotate(p.age * 2);
-  ctx.setLineDash([4, 6]);
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(0, 0, r + 5, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.font = `bold 13px ${FONT}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(icon, p.cx, p.cy + 1);
-  ctx.restore();
+  const cx = px(p.cx);
+  const cy = px(p.cy);
+  circle(ctx, cx, cy, 7, PAL.outline);
+  circle(ctx, cx, cy, 6, p.cfg.color);
+  circle(ctx, cx, cy, 4, PAL.ink);
+  text(ctx, POWERUP_ICONS[p.type] ?? '?', cx + 1, cy + 1, p.cfg.color);
 }
 
 export function drawTorpedo(ctx, t, time) {
-  const r = t.width / 2;
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  const trail = ctx.createLinearGradient(t.cx - 80, 0, t.cx, 0);
-  trail.addColorStop(0, 'rgba(120, 200, 255, 0)');
-  trail.addColorStop(1, 'rgba(160, 220, 255, 0.9)');
-  ctx.fillStyle = trail;
-  ctx.fillRect(t.cx - 80, t.cy - r / 2, 80, r);
-  const core = ctx.createRadialGradient(t.cx, t.cy, 0, t.cx, t.cy, r * 1.6);
-  core.addColorStop(0, '#ffffff');
-  core.addColorStop(0.4, '#9fdcff');
-  core.addColorStop(1, 'rgba(80, 160, 255, 0)');
-  ctx.fillStyle = core;
-  ctx.beginPath();
-  ctx.arc(t.cx, t.cy, r * 1.6 * (0.85 + 0.15 * Math.sin(time * 40)), 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  const cx = px(t.cx);
+  const cy = px(t.cy);
+  for (let i = 1; i <= 6; i++) rect(ctx, cx - i * 3, cy - (i < 3 ? 1 : 0), 2, i < 3 ? 2 : 1, i < 3 ? PAL.cyan : PAL.glassDk);
+  circle(ctx, cx, cy, Math.floor(time * 20) % 2 ? 3 : 2, PAL.cyan);
+  rect(ctx, cx - 1, cy - 1, 2, 2, PAL.white);
 }

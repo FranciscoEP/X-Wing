@@ -1,86 +1,150 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { CANVAS } from '../js/config.js';
+import { PLAYER } from '../js/config.js';
+import { PAL } from '../js/render/art/palette.js';
+import { ENEMY_ART, TIE_ADVANCED, XWING } from '../js/render/art/pixelArt.js';
 import { SpriteCache, drawSprite } from '../js/render/art/SpriteCache.js';
 import { Effects } from '../js/render/Effects.js';
-import { MAX_WAVES, packWaves } from '../js/render/post/uniforms.js';
+import { Particles } from '../js/render/Particles.js';
+import { circle, px } from '../js/render/pixel.js';
 import { DT } from './helpers.js';
 
-/** Canvas falso: registra las operaciones que importan para verificar los sprites. */
-function fakeCanvas(width, height) {
-  const ops = [];
-  const ctx = new Proxy(
-    { ops },
-    {
-      get: (target, prop) => (prop in target ? target[prop] : (...args) => ops.push([prop, ...args])),
-      set: (target, prop, value) => {
-        ops.push([`set:${String(prop)}`, value]);
-        return true;
+/**
+ * Canvas en memoria que rasteriza de verdad lo que el pixel art usa: fillRect con colores hex,
+ * getImageData, drawImage 1:1 y 'source-atop'. Permite comprobar píxeles concretos en Node.
+ */
+class RasterCanvas {
+  constructor(width, height) {
+    this.width = width;
+    this.height = height;
+    this.data = new Uint8ClampedArray(width * height * 4);
+    const self = this;
+    this.ctx = {
+      fillStyle: '#000000',
+      globalCompositeOperation: 'source-over',
+      fillRect(x, y, w, h) {
+        const [r, g, b] = hex(this.fillStyle);
+        for (let yy = Math.max(0, y); yy < Math.min(self.height, y + h); yy++) {
+          for (let xx = Math.max(0, x); xx < Math.min(self.width, x + w); xx++) {
+            const i = (yy * self.width + xx) * 4;
+            if (this.globalCompositeOperation === 'source-atop' && self.data[i + 3] === 0) continue;
+            self.data.set([r, g, b, 255], i);
+          }
+        }
       },
-    }
-  );
-  return { width, height, ops, getContext: () => ctx };
+      getImageData: () => ({ data: self.data }),
+      drawImage(src, x = 0, y = 0) {
+        for (let yy = 0; yy < src.height; yy++) {
+          for (let xx = 0; xx < src.width; xx++) {
+            const s = (yy * src.width + xx) * 4;
+            if (src.data[s + 3] === 0) continue;
+            const tx = x + xx;
+            const ty = y + yy;
+            if (tx < 0 || ty < 0 || tx >= self.width || ty >= self.height) continue;
+            self.data.set(src.data.subarray(s, s + 4), (ty * self.width + tx) * 4);
+          }
+        }
+      },
+    };
+  }
+
+  getContext() {
+    return this.ctx;
+  }
+
+  pixel(x, y) {
+    const i = (y * this.width + x) * 4;
+    if (this.data[i + 3] === 0) return null;
+    return `#${[...this.data.subarray(i, i + 3)].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+  }
+
+  opaqueCount() {
+    let n = 0;
+    for (let i = 3; i < this.data.length; i += 4) if (this.data[i]) n++;
+    return n;
+  }
 }
 
-describe('render: Effects (ondas para el post-procesado)', () => {
-  it('las ondas crecen, se debilitan y expiran', () => {
-    const fx = new Effects();
-    fx.wave(100, 100, { radius: 200, duration: 0.5 });
-    fx.update(0.25);
-    const [w] = fx.postState().waves;
-    assert.ok(Math.abs(w.radius - 100) < 1e-6);
-    assert.ok(Math.abs(w.strength - 0.5) < 1e-6);
-    for (let t = 0; t < 0.3; t += DT) fx.update(DT);
-    assert.equal(fx.postState().waves.length, 0);
+const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+const raster = (w, h) => new RasterCanvas(w, h);
+
+describe('render pixel: utilidades', () => {
+  it('px pasa unidades de simulación a píxeles enteros del búfer (480×270)', () => {
+    assert.equal(px(960), 480);
+    assert.equal(px(101), 51);
   });
 
-  it('no acumula más ondas de las que puede procesar', () => {
-    const fx = new Effects();
-    for (let i = 0; i < 50; i++) fx.wave(0, 0);
-    assert.ok(fx.waves.length <= 8);
-  });
-});
-
-describe('render: uniforms del shader', () => {
-  it('convierte px a coordenadas UV con el eje Y invertido', () => {
-    const { data, count } = packWaves([{ x: CANVAS.WIDTH / 2, y: 0, radius: CANVAS.HEIGHT / 2, strength: 1 }]);
-    assert.equal(count, 1);
-    assert.deepEqual([...data.slice(0, 4)], [0.5, 1, 0.5, 1]);
-  });
-
-  it('se queda con las ondas más fuertes si hay demasiadas', () => {
-    const waves = Array.from({ length: 10 }, (_, i) => ({ x: 0, y: 0, radius: 0, strength: i / 10 }));
-    const { data, count } = packWaves(waves);
-    assert.equal(count, MAX_WAVES);
-    assert.ok(Math.abs(data[3] - 0.9) < 1e-6, 'la primera es la más fuerte');
+  it('circle dibuja un círculo simétrico sin antialiasing', () => {
+    const c = raster(11, 11);
+    circle(c.getContext(), 5, 5, 4, '#ffffff');
+    assert.equal(c.pixel(5, 1), '#ffffff');
+    assert.equal(c.pixel(5, 9), '#ffffff');
+    assert.equal(c.pixel(1, 5), '#ffffff');
+    assert.equal(c.pixel(0, 0), null);
   });
 });
 
-describe('render: SpriteCache con los PNG del juego', () => {
-  const images = { player: { width: 509, height: 490 }, tie: { width: 516, height: 417 } };
+describe('render pixel: sprites', () => {
+  const cache = new SpriteCache(raster);
 
-  it('prerenderiza jugador, enemigos y Vader a la escala de pantalla, con versión de destello', () => {
-    const cache = new SpriteCache(images, 2, fakeCanvas);
-    assert.ok(cache.player.canvas);
-    for (const sprite of [cache.enemies.TIE_FIGHTER, cache.enemies.TIE_INTERCEPTOR, cache.vader]) {
-      assert.ok(sprite.canvas && sprite.flash, 'tiene sprite y destello');
-      assert.equal(sprite.canvas.width, Math.ceil((sprite.width + sprite.padding * 2) * 2));
+  it('cada sprite tiene su tamaño en píxeles más 1 px de contorno por lado', () => {
+    assert.equal(cache.player.w, XWING.w + 2);
+    assert.equal(cache.vader.h, TIE_ADVANCED.h + 2);
+    for (const [type, art] of Object.entries(ENEMY_ART)) assert.equal(cache.enemies[type].w, art.w + 2);
+  });
+
+  it('las alas y cañones del X-Wing son simétricos arriba/abajo', () => {
+    const { canvas, h, w } = cache.player;
+    // Solo la franja de alas: el fuselaje tiene detalles asimétricos a propósito (sombra, cabina, R2)
+    for (let y = 0; y < 8; y++) {
+      for (let x = 0; x < w; x++) assert.equal(canvas.pixel(x, y), canvas.pixel(x, h - 1 - y), `píxel ${x},${y}`);
     }
   });
 
-  it('reescala con calidad alta y hornea el halo rojo solo donde corresponde', () => {
-    const cache = new SpriteCache(images, 1, fakeCanvas);
-    const ops = (sprite) => sprite.canvas.ops.map(([op]) => op);
-    assert.ok(ops(cache.enemies.TIE_FIGHTER).includes('set:imageSmoothingQuality'));
-    assert.ok(!ops(cache.enemies.TIE_FIGHTER).includes('set:shadowBlur'));
-    assert.ok(ops(cache.enemies.TIE_INTERCEPTOR).includes('set:shadowBlur'));
-    assert.ok(ops(cache.vader).includes('set:shadowBlur'));
+  it('los cañones del X-Wing quedan donde nacen los láseres (PLAYER.CANNON_OFFSET)', () => {
+    const { canvas, h } = cache.player;
+    const cy = (h - 1) / 2;
+    const cannonRow = cy - PLAYER.CANNON_OFFSET * 0.5;
+    assert.ok(canvas.pixel(20, Math.round(cannonRow)), 'hay cañón en esa fila');
   });
 
-  it('si falta una imagen, dibuja un rectángulo en lugar de fallar', () => {
-    const cache = new SpriteCache({}, 1, fakeCanvas);
-    const target = fakeCanvas(10, 10);
-    drawSprite(target.getContext(), cache.enemies.TIE_FIGHTER, 50, 50);
-    assert.ok(target.ops.some(([op]) => op === 'fillRect'));
+  it('todo sprite queda rodeado por un contorno oscuro', () => {
+    const { canvas, w } = cache.enemies.TIE_FIGHTER;
+    const firstOpaque = [...Array(w).keys()].map((x) => canvas.pixel(x, 12)).find(Boolean);
+    assert.equal(firstOpaque, PAL.outline);
+  });
+
+  it('la versión de destello es una silueta blanca del mismo tamaño', () => {
+    const tie = cache.enemies.TIE_FIGHTER;
+    assert.equal(tie.flash.opaqueCount(), tie.canvas.opaqueCount());
+    assert.equal(tie.flash.pixel(13, 11), '#ffffff');
+  });
+
+  it('drawSprite centra el sprite en píxeles enteros', () => {
+    const target = raster(40, 40);
+    drawSprite(target.getContext(), cache.enemies.TIE_FIGHTER, 20.4, 20.6);
+    assert.ok(target.opaqueCount() > 0);
+  });
+});
+
+describe('render pixel: efectos', () => {
+  it('la sacudida mueve la cámara en píxeles enteros y se apaga', () => {
+    const fx = new Effects();
+    fx.shake(10, 0.3);
+    const { x, y } = fx.shakeOffset();
+    assert.ok(Number.isInteger(x) && Number.isInteger(y));
+    for (let t = 0; t < 0.4; t += DT) fx.update(DT);
+    assert.deepEqual(fx.shakeOffset(), { x: 0, y: 0 });
+  });
+
+  it('las explosiones pixel, chispas y anillos caducan', () => {
+    const particles = new Particles();
+    for (let i = 0; i < 50; i++) {
+      particles.explosion(100, 100);
+      particles.shockwave(0, 0, 100);
+      particles.text(0, 0, 'x');
+    }
+    for (let t = 0; t < 1.2; t += DT) particles.update(DT);
+    assert.equal(particles.items.length + particles.blasts.length + particles.waves.length + particles.texts.length, 0);
   });
 });

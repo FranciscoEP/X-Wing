@@ -1,11 +1,6 @@
 import { rand } from '../core/utils.js';
 
-const MAX_WAVES = 8;
-
-/**
- * Efectos de cámara: sacudida y destello (canvas 2D) y, para el post-procesado WebGL,
- * ondas expansivas de distorsión. Solo estado: las ondas las dibuja PostFX.
- */
+/** Sacudida de cámara (en píxeles enteros, para no romper la cuadrícula) y destellos de pantalla. */
 export class Effects {
   constructor() {
     this.shakeTime = 0;
@@ -14,9 +9,9 @@ export class Effects {
     this.flashColor = '#fff';
     this.flashTime = 0;
     this.flashDuration = 0;
-    this.waves = [];
   }
 
+  /** `intensity` en unidades de simulación (se dibuja a la mitad, en píxeles enteros). */
   shake(intensity, duration) {
     // No reemplazar una sacudida más fuerte en curso
     if (this.shakeTime > 0 && intensity < this.shakeIntensity) return;
@@ -29,39 +24,23 @@ export class Effects {
     this.flashDuration = this.flashTime = duration;
   }
 
-  /** Onda que se expande desde (x, y) hasta `radius` px en `duration` s. */
-  wave(x, y, { radius = 200, duration = 0.6, strength = 1 } = {}) {
-    this.waves.push({ x, y, maxRadius: radius, duration, strength, age: 0 });
-    if (this.waves.length > MAX_WAVES) this.waves.shift();
-  }
-
   update(dt) {
     this.shakeTime = Math.max(0, this.shakeTime - dt);
     this.flashTime = Math.max(0, this.flashTime - dt);
-    for (const w of this.waves) w.age += dt;
-    this.waves = this.waves.filter((w) => w.age < w.duration);
   }
 
-  /** Estado para PostFX: ondas con su radio actual y fuerza decreciente. */
-  postState() {
-    return {
-      waves: this.waves.map((w) => {
-        const p = w.age / w.duration;
-        return { x: w.x, y: w.y, radius: w.maxRadius * p, strength: w.strength * (1 - p) };
-      }),
-    };
-  }
-
-  applyShake(ctx) {
-    if (this.shakeTime <= 0) return;
-    const k = this.shakeIntensity * (this.shakeTime / this.shakeDuration);
-    ctx.translate(rand(-k, k), rand(-k, k));
+  /** Desplazamiento de cámara de este frame, en píxeles enteros. */
+  shakeOffset() {
+    if (this.shakeTime <= 0) return { x: 0, y: 0 };
+    const k = (this.shakeIntensity / 2) * (this.shakeTime / this.shakeDuration);
+    return { x: Math.round(rand(-k, k)), y: Math.round(rand(-k, k)) };
   }
 
   drawFlash(ctx, width, height) {
     if (this.flashTime <= 0) return;
     ctx.save();
-    ctx.globalAlpha = (this.flashTime / this.flashDuration) * 0.6;
+    // Destello en escalones (como el parpadeo de un arcade), no un fundido suave
+    ctx.globalAlpha = Math.ceil((this.flashTime / this.flashDuration) * 3) / 3 * 0.45;
     ctx.fillStyle = this.flashColor;
     ctx.fillRect(0, 0, width, height);
     ctx.restore();

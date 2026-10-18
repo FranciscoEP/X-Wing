@@ -1,8 +1,11 @@
 import { rand } from '../core/utils.js';
 import { LASER, LASER_STATE, RADIUS } from '../sim/bosses/DeathStar.js';
 import { TURRETS } from '../sim/bosses/StarDestroyer.js';
-import { CHARGE, VADER_MODE } from '../sim/bosses/TieAdvanced.js';
+import { VADER_MODE } from '../sim/bosses/TieAdvanced.js';
+import { RENDER } from '../config.js';
+import { PAL } from './art/palette.js';
 import { drawSprite } from './art/SpriteCache.js';
+import { px, rect, ring } from './pixel.js';
 
 const HIT_FLASH = 'rgba(255, 255, 255, 0.35)';
 
@@ -12,75 +15,64 @@ const HIT_FLASH = 'rgba(255, 255, 255, 0.35)';
  * El destello de impacto no usa `ctx.filter` (no funciona en Safari): cada jefe lo pinta.
  */
 export const BOSS_RENDERERS = {
-  TIE_ADVANCED: { body: drawTieAdvanced, overlay: drawVaderOverlay },
+  TIE_ADVANCED: { body: drawTieAdvanced, overlay: drawVaderOverlay, pixel: true },
+  // Provisionales: vectores escalados al búfer. Se rehacen en pixel art en los pasos 4 y 5.
   STAR_DESTROYER: { body: drawStarDestroyer },
   DEATH_STAR: { body: drawDeathStar, overlay: drawSuperlaser },
 };
 
-export function drawBoss(ctx, boss, assets) {
+/** Los jefes pixel dibujan en píxeles del búfer; los provisionales, en unidades de simulación escaladas. */
+function inSpace(ctx, renderer, draw) {
   ctx.save();
-  if (boss.dying) ctx.translate(rand(-3, 3), rand(-3, 3));
-  BOSS_RENDERERS[boss.type].body(ctx, boss, { ...assets, flash: boss.hitFlash > 0 });
+  if (!renderer.pixel) ctx.scale(RENDER.SCALE, RENDER.SCALE);
+  draw();
+  ctx.restore();
+}
+
+export function drawBoss(ctx, boss, assets) {
+  const renderer = BOSS_RENDERERS[boss.type];
+  ctx.save();
+  if (boss.dying) ctx.translate(Math.round(rand(-2, 2)), Math.round(rand(-2, 2)));
+  inSpace(ctx, renderer, () => renderer.body(ctx, boss, { ...assets, flash: boss.hitFlash > 0 }));
   ctx.restore();
 }
 
 export function drawBossOverlay(ctx, boss, assets) {
-  BOSS_RENDERERS[boss.type].overlay?.(ctx, boss, assets);
+  const renderer = BOSS_RENDERERS[boss.type];
+  if (renderer.overlay) inSpace(ctx, renderer, () => renderer.overlay(ctx, boss, assets));
 }
 
-function drawTieAdvanced(ctx, boss, { sprites, flash }) {
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
+function drawTieAdvanced(ctx, boss, { sprites, flash, time }) {
+  const cx = px(boss.cx);
+  const cy = px(boss.cy);
   // Estela roja durante la embestida
   if (boss.mode === VADER_MODE.CHARGE) {
-    const x = boss.x + boss.width * 0.6;
-    const trail = ctx.createLinearGradient(x, 0, x + 200, 0);
-    trail.addColorStop(0, 'rgba(255, 70, 70, 0.6)');
-    trail.addColorStop(1, 'rgba(255, 70, 70, 0)');
-    ctx.fillStyle = trail;
-    ctx.fillRect(x, boss.cy - boss.height * 0.18, 200, boss.height * 0.36);
+    for (let i = 0; i < 8; i++) rect(ctx, cx + 18 + i * 6, cy - 2 + (i % 2), 4, 3, i < 3 ? PAL.redHi : PAL.red);
   }
-  // Halo rojo que crece durante el aviso de embestida
-  if (boss.mode === VADER_MODE.WINDUP) {
-    const p = 1 - boss.modeTimer / CHARGE.WINDUP;
-    const halo = ctx.createRadialGradient(boss.cx, boss.cy, 0, boss.cx, boss.cy, boss.width * (0.5 + p * 0.4));
-    halo.addColorStop(0, `rgba(255, 50, 50, ${0.3 + p * 0.4})`);
-    halo.addColorStop(1, 'rgba(255, 50, 50, 0)');
-    ctx.fillStyle = halo;
-    ctx.fillRect(boss.x - boss.width, boss.y - boss.height, boss.width * 3, boss.height * 3);
-  }
-  ctx.restore();
-  drawSprite(ctx, sprites.vader, boss.cx, boss.cy, { flash });
+  // Halo rojo parpadeante durante el aviso de embestida
+  if (boss.mode === VADER_MODE.WINDUP && Math.floor(time * 16) % 2) ring(ctx, cx, cy, 24, PAL.red, { dash: 3 });
+  drawSprite(ctx, sprites.vader, cx, cy, { flash });
 }
 
 /** Aviso de embestida (franja roja) y escudo deflector, por encima del jugador. */
 function drawVaderOverlay(ctx, boss, { time }) {
   if (boss.dying) return;
   if (boss.mode === VADER_MODE.WINDUP) {
-    const p = 1 - boss.modeTimer / CHARGE.WINDUP;
+    const y = px(boss.chargeY);
+    const h = px(boss.height);
+    const w = px(boss.x);
     ctx.save();
-    ctx.fillStyle = `rgba(255, 40, 40, ${0.08 + 0.12 * p})`;
-    ctx.fillRect(0, boss.chargeY, boss.x, boss.height);
-    ctx.strokeStyle = `rgba(255, 60, 60, ${0.4 + 0.4 * Math.abs(Math.sin(time * 18))})`;
-    ctx.setLineDash([14, 10]);
-    ctx.lineWidth = 2;
-    ctx.strokeRect(0, boss.chargeY, boss.x, boss.height);
+    ctx.globalAlpha = 0.18;
+    rect(ctx, 0, y, w, h, PAL.red);
     ctx.restore();
+    if (Math.floor(time * 12) % 2) {
+      for (let x = 0; x < w; x += 8) {
+        rect(ctx, x, y, 4, 1, PAL.red);
+        rect(ctx, x, y + h - 1, 4, 1, PAL.red);
+      }
+    }
   }
-  if (boss.shielded) {
-    ctx.save();
-    ctx.globalAlpha = 0.35 + 0.15 * Math.sin(time * 10);
-    ctx.strokeStyle = '#ff5c5c';
-    ctx.fillStyle = 'rgba(255, 80, 80, 0.12)';
-    ctx.lineWidth = 3;
-    ctx.shadowColor = '#ff2e2e';
-    ctx.shadowBlur = 20;
-    ctx.beginPath();
-    ctx.ellipse(boss.cx, boss.cy, boss.width * 0.7, boss.height * 0.7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-  }
+  if (boss.shielded) ring(ctx, px(boss.cx), px(boss.cy), 0, PAL.redHi, { rx: 28, ry: 24, dash: Math.floor(time * 8) % 2 ? 2 : 3 });
 }
 
 function drawStarDestroyer(ctx, boss, { time, flash }) {

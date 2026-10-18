@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#02040c" />
+    <meta name="theme-color" content="#04060f" />
     <title>X-Wing: Asalto a la Estrella de la Muerte</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
@@ -81,7 +81,8 @@
           <div class="panel menu-panel">
             <p class="label" id="difficulty-label">Rango de piloto</p>
             <div class="difficulties" role="radiogroup" aria-labelledby="difficulty-label" data-ref="difficulties"></div>
-            <button class="btn btn-primary" type="button" data-action="start">Despegar <kbd>Enter</kbd></button>
+            <button class="btn btn-primary" type="button" data-action="start">Despegar</button>
+            <p class="press-start">Pulsa Enter</p>
             <p class="menu-record" data-ref="menuRecord"></p>
           </div>
         </section>
@@ -91,8 +92,8 @@
           <div class="panel dialog">
             <h2 id="pause-title" class="dialog-title">Pausa</h2>
             <div class="actions">
-              <button class="btn btn-primary" type="button" data-action="resume">Continuar <kbd>P</kbd></button>
-              <button class="btn" type="button" data-action="menu">Abandonar misión <kbd>Q</kbd></button>
+              <button class="btn btn-primary" type="button" data-action="resume">Continuar</button>
+              <button class="btn" type="button" data-action="menu">Abandonar</button>
             </div>
           </div>
         </section>
@@ -106,13 +107,13 @@
             <p class="end-record" data-ref="endRecord"></p>
             <dl class="stats" data-ref="endStats"></dl>
             <div class="actions">
-              <button class="btn btn-primary" type="button" data-action="start">Volver a volar <kbd>Enter</kbd></button>
+              <button class="btn btn-primary" type="button" data-action="start">Volver a volar</button>
               <button class="btn" type="button" data-action="menu">Menú</button>
             </div>
           </div>
         </section>
 
-        <p class="loading">Calibrando sistemas…</p>
+        <p class="loading">Cargando…</p>
         <div class="scanlines" aria-hidden="true"></div>
       </div>
 

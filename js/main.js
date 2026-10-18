@@ -1,4 +1,4 @@
-import { ASSETS, CANVAS, MAX_RENDER_SCALE, PHASES } from './config.js';
+import { ASSETS, PHASES, RENDER } from './config.js';
 import { loadImages } from './core/assets.js';
 import { AudioManager } from './core/Audio.js';
 import { CombinedInput } from './core/CombinedInput.js';
@@ -7,7 +7,6 @@ import { Storage } from './core/storage.js';
 import { TouchInput } from './core/TouchInput.js';
 import { Game } from './Game.js';
 import { spriteToDataUrl } from './render/art/SpriteCache.js';
-import { PostFX } from './render/post/PostFX.js';
 import { Renderer } from './render/Renderer.js';
 import { CockpitUI } from './ui/CockpitUI.js';
 
@@ -46,46 +45,35 @@ function createInput(viewport) {
 }
 
 /**
- * El juego se dibuja en el canvas 2D #game. Si hay WebGL2 (y no se pidió `?nofx`), un segundo
- * canvas encima aplica el post-procesado y #game queda como fuente invisible.
+ * Escala entera del visor: el búfer de 480×270 se amplía ×2, ×3, ×4… para que cada píxel del
+ * juego ocupe exactamente N píxeles de pantalla (pixel perfect). La interfaz usa la misma
+ * unidad (--px) para que HUD y menús compartan la cuadrícula del juego. En pantallas más chicas
+ * que 480 px se usa una escala fraccionaria.
  */
-function setupCanvases(viewport, scale) {
-  const canvas = document.getElementById('game');
-  canvas.width = Math.round(CANVAS.WIDTH * scale);
-  canvas.height = Math.round(CANVAS.HEIGHT * scale);
-  if (params.has('nofx')) return { canvas, postFx: null };
-
-  const fxCanvas = document.createElement('canvas');
-  fxCanvas.className = 'fx-canvas';
-  fxCanvas.width = canvas.width;
-  fxCanvas.height = canvas.height;
-  fxCanvas.setAttribute('aria-hidden', 'true');
-  const postFx = PostFX.create(fxCanvas);
-  if (!postFx) return { canvas, postFx: null };
-
-  canvas.after(fxCanvas);
-  viewport.dataset.postfx = 'on';
-  // Si el navegador pierde el contexto WebGL, se vuelve a mostrar el canvas 2D sin efectos
-  fxCanvas.addEventListener('webglcontextlost', () => {
-    delete viewport.dataset.postfx;
-    fxCanvas.remove();
-  });
-  return { canvas, postFx };
+function fitViewport(viewport) {
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const availW = window.innerWidth - 32;
+  const availH = window.innerHeight - (touch ? 32 : 96);
+  const fit = Math.min(availW / RENDER.WIDTH, availH / RENDER.HEIGHT);
+  const scale = fit >= 1 ? Math.floor(fit) : fit;
+  viewport.style.setProperty('--px', `${scale}px`);
+  viewport.style.width = `${RENDER.WIDTH * scale}px`;
 }
 
 async function boot() {
   const viewport = document.getElementById('viewport');
-  const scale = Math.min(MAX_RENDER_SCALE, Math.max(1, window.devicePixelRatio || 1));
-  const { canvas, postFx } = setupCanvases(viewport, scale);
+  const canvas = document.getElementById('game');
+  fitViewport(viewport);
+  window.addEventListener('resize', () => fitViewport(viewport));
 
   const [images] = await Promise.all([
     loadImages(ASSETS.images),
-    // Esperar a la fuente evita que el primer frame se dibuje con la tipografía por defecto
-    document.fonts?.load('bold 16px "Orbitron"').catch(() => {}),
+    // La tipografía pixel también se usa dentro del canvas (puntos, iconos): hay que esperarla
+    document.fonts?.load('8px "Press Start 2P"').catch(() => {}),
   ]);
 
   const storage = new Storage();
-  const renderer = new Renderer({ canvas, images, scale, postFx });
+  const renderer = new Renderer({ canvas, images });
   const game = new Game({
     input: createInput(viewport),
     // `?silencio` arranca sin audio (útil para pruebas)
@@ -96,7 +84,7 @@ async function boot() {
   });
 
   game.ui = new CockpitUI(viewport, {
-    playerIcon: spriteToDataUrl(renderer.sprites.player) ?? ASSETS.images.player,
+    playerIcon: spriteToDataUrl(renderer.sprites.player),
     actions: {
       start: () => game.retry(),
       resume: () => game.resume(),

@@ -1,99 +1,97 @@
-import { BOSS_TYPES, ENEMY_TYPES, PLAYER } from '../../config.js';
+import { PAL } from './palette.js';
+import { ENEMY_ART, TIE_ADVANCED, XWING } from './pixelArt.js';
+
+const OUTLINE = 1; // px de contorno alrededor de cada sprite
 
 /**
- * Variantes de cada nave a partir de los PNG del juego. `glow` se hornea en el sprite con
- * shadowBlur una sola vez (no en cada frame); `shade` oscurece la nave (la de Vader).
- */
-export const SPRITE_STYLES = {
-  player: { image: 'player', width: PLAYER.WIDTH, height: PLAYER.HEIGHT },
-  TIE_FIGHTER: { image: 'tie', size: ENEMY_TYPES.TIE_FIGHTER.size },
-  TIE_INTERCEPTOR: { image: 'tie', size: ENEMY_TYPES.TIE_INTERCEPTOR.size, glow: { color: '#ff4d4d', blur: 10 } },
-  TIE_ADVANCED: {
-    image: 'tie',
-    width: BOSS_TYPES.TIE_ADVANCED.width,
-    height: BOSS_TYPES.TIE_ADVANCED.height,
-    shade: 0.35,
-    glow: { color: '#ff2e2e', blur: 18 },
-  },
-};
-
-const PADDING = 4; // px lógicos alrededor del sprite (más el halo si lo tiene)
-
-/**
- * Prerenderiza cada nave una sola vez, a la escala de la pantalla, con reescalado de alta
- * calidad. Dibujar el sprite cacheado es mucho más barato que reescalar el PNG original en cada
- * frame. Cada enemigo tiene además su versión `flash` (silueta blanca) para los impactos,
- * en lugar de `ctx.filter`, que no funciona en Safari.
+ * Pinta cada nave de pixelArt.js una sola vez en un canvas propio, le añade el contorno
+ * oscuro de 1 px y una versión `flash` (silueta blanca) para los impactos.
  */
 export class SpriteCache {
-  constructor(images, scale = 1, createCanvas = defaultCreateCanvas) {
-    this.images = images;
-    this.scale = scale;
+  constructor(createCanvas = defaultCreateCanvas) {
     this.createCanvas = createCanvas;
-    this.player = this.build(SPRITE_STYLES.player);
-    this.enemies = {
-      TIE_FIGHTER: this.withFlash(this.build(SPRITE_STYLES.TIE_FIGHTER)),
-      TIE_INTERCEPTOR: this.withFlash(this.build(SPRITE_STYLES.TIE_INTERCEPTOR)),
-    };
-    this.vader = this.withFlash(this.build(SPRITE_STYLES.TIE_ADVANCED));
+    this.player = this.build(XWING);
+    this.enemies = Object.fromEntries(Object.entries(ENEMY_ART).map(([type, art]) => [type, this.withFlash(this.build(art))]));
+    this.vader = this.withFlash(this.build(TIE_ADVANCED));
   }
 
-  /** Sprite de `style.width`×`style.height` lógicos (o `size`×`size·0.8` para los TIE). Null si falta la imagen. */
-  build(style) {
-    const image = this.images[style.image];
-    const width = style.width ?? style.size;
-    const height = style.height ?? style.size * 0.8;
-    if (!image) return { canvas: null, width, height, padding: 0 };
-
-    const padding = PADDING + (style.glow?.blur ?? 0);
-    const s = this.scale;
-    const canvas = this.createCanvas(Math.ceil((width + padding * 2) * s), Math.ceil((height + padding * 2) * s));
+  build(art) {
+    const w = art.w + OUTLINE * 2;
+    const h = art.h + OUTLINE * 2;
+    const canvas = this.createCanvas(w, h);
     const ctx = canvas.getContext('2d');
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    const x = padding * s;
-    const y = padding * s;
-
-    if (style.glow) {
-      ctx.shadowColor = style.glow.color;
-      ctx.shadowBlur = style.glow.blur * s;
-    }
-    ctx.drawImage(image, x, y, width * s, height * s);
-    if (style.glow) ctx.shadowBlur = 0;
-
-    if (style.shade) {
-      // Oscurece solo la nave (source-atop respeta la transparencia del PNG)
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.fillStyle = `rgba(0, 0, 0, ${style.shade})`;
-      ctx.fillRect(x, y, width * s, height * s);
-      ctx.globalCompositeOperation = 'source-over';
-    }
-    return { canvas, width, height, padding };
+    art.paint(painter(ctx, OUTLINE, OUTLINE));
+    addOutline(ctx, w, h);
+    return { canvas, w, h };
   }
 
-  /** Añade una silueta blanca del sprite (para el destello al recibir daño). */
   withFlash(sprite) {
-    if (!sprite.canvas) return sprite;
-    const flash = this.createCanvas(sprite.canvas.width, sprite.canvas.height);
+    const flash = this.createCanvas(sprite.w, sprite.h);
     const ctx = flash.getContext('2d');
     ctx.drawImage(sprite.canvas, 0, 0);
     ctx.globalCompositeOperation = 'source-atop';
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, flash.width, flash.height);
+    ctx.fillRect(0, 0, sprite.w, sprite.h);
     return { ...sprite, flash };
   }
 }
 
-/** Dibuja un sprite centrado en (cx, cy) con su tamaño lógico; si falta la imagen, un rectángulo. */
-export function drawSprite(ctx, sprite, cx, cy, { flash = false } = {}) {
-  if (!sprite.canvas) {
-    ctx.fillStyle = flash ? '#fff' : '#888';
-    ctx.fillRect(cx - sprite.width / 2, cy - sprite.height / 2, sprite.width, sprite.height);
-    return;
+/** Primitivas enteras con desplazamiento y reflejos (ver pixelArt.js). */
+export function painter(ctx, ox = 0, oy = 0) {
+  let fx = null; // eje de reflejo horizontal activo
+  let fy = null; // eje de reflejo vertical activo
+  const put = (x, y, w, h, color) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(Math.round(ox + x), Math.round(oy + y), w, h);
+  };
+  const r = (x, y, w, h, color) => {
+    put(x, y, w, h, color);
+    if (fx !== null) put(2 * fx - x - w + 1, y, w, h, color);
+    if (fy !== null) put(x, 2 * fy - y - h + 1, w, h, color);
+  };
+  const p = {
+    r,
+    c(cx, cy, rad, color) {
+      for (let dy = -rad; dy <= rad; dy++) {
+        const half = Math.round(Math.sqrt(Math.max(0, rad * rad - dy * dy)));
+        r(cx - half, cy + dy, half * 2 + 1, 1, color);
+      }
+    },
+    line(x0, y0, x1, y1, color, size = 1) {
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
+      for (let i = 0; i <= n; i++) r(Math.round(x0 + ((x1 - x0) * i) / n), Math.round(y0 + ((y1 - y0) * i) / n), size, 1, color);
+    },
+    mirrorX(axis, draw) {
+      fx = axis;
+      draw();
+      fx = null;
+    },
+    mirrorY(axis, draw) {
+      fy = axis;
+      draw();
+      fy = null;
+    },
+  };
+  return p;
+}
+
+/** Contorno de 1 px: cada píxel transparente junto a uno opaco se pinta del color de contorno. */
+function addOutline(ctx, w, h) {
+  const img = ctx.getImageData(0, 0, w, h);
+  const a = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : img.data[(y * w + x) * 4 + 3]);
+  const edge = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (a(x, y) === 0 && (a(x - 1, y) || a(x + 1, y) || a(x, y - 1) || a(x, y + 1))) edge.push([x, y]);
+    }
   }
-  const w = sprite.width + sprite.padding * 2;
-  const h = sprite.height + sprite.padding * 2;
-  ctx.drawImage(flash && sprite.flash ? sprite.flash : sprite.canvas, cx - w / 2, cy - h / 2, w, h);
+  ctx.fillStyle = PAL.outline;
+  for (const [x, y] of edge) ctx.fillRect(x, y, 1, 1);
+}
+
+/** Dibuja un sprite centrado en (cx, cy) píxeles del búfer, alineado a la cuadrícula. */
+export function drawSprite(ctx, sprite, cx, cy, { flash = false } = {}) {
+  ctx.drawImage(flash && sprite.flash ? sprite.flash : sprite.canvas, Math.round(cx - sprite.w / 2), Math.round(cy - sprite.h / 2));
 }
 
 function defaultCreateCanvas(width, height) {
@@ -103,7 +101,7 @@ function defaultCreateCanvas(width, height) {
   return canvas;
 }
 
-/** Imagen PNG (data URL) de un sprite para usarla en el HTML (vidas del HUD), o null. */
+/** PNG (data URL) de un sprite para el HTML (vidas del HUD). */
 export function spriteToDataUrl(sprite) {
-  return sprite.canvas ? sprite.canvas.toDataURL('image/png') : null;
+  return sprite.canvas.toDataURL('image/png');
 }

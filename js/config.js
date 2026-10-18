@@ -1,7 +1,10 @@
 // Configuración central del juego. Velocidades en px/s, tiempos en segundos.
 // Todo valor de balance vive aquí: la lógica no debe contener números mágicos.
 
+// La simulación usa un espacio de 960×540 unidades; se dibuja en un búfer pixel de 480×270
+// (RENDER.SCALE = 0.5) que el navegador amplía sin suavizar: pixel art de 16 bits.
 export const CANVAS = { WIDTH: 960, HEIGHT: 540 };
+export const RENDER = { WIDTH: 480, HEIGHT: 270, SCALE: 0.5 };
 
 export const KEYS = {
   UP: ['KeyW', 'ArrowUp'],
@@ -103,7 +106,7 @@ export const BOSS = {
 };
 
 export const BOSS_TYPES = {
-  TIE_ADVANCED: { name: 'TIE Advanced x1 — Darth Vader', hp: 600, score: 3000, width: 110, height: 92 },
+  TIE_ADVANCED: { name: 'TIE Advanced x1 — Darth Vader', hp: 600, score: 3000, width: 80, height: 68 },
   STAR_DESTROYER: { name: 'Destructor Estelar clase Imperial', hp: 1200, score: 6000, width: 400, height: 190 },
   DEATH_STAR: { name: 'Estrella de la Muerte', hp: 700, score: 15000, width: 420, height: 420 },
 };
@@ -171,9 +174,8 @@ export const SCORE = {
 };
 
 export const ASSETS = {
+  // Las naves son pixel art dibujado por código (render/art/pixelArt.js); solo el fondo es imagen
   images: {
-    player: 'images/xwing2.png',
-    tie: 'images/Caza.png',
     background: 'images/zoey.png',
   },
   sounds: {
@@ -184,6 +186,3 @@ export const ASSETS = {
 };
 
 export const STORAGE_KEYS = { HIGH_SCORE: 'xwing.highscore', MUTED: 'xwing.muted' };
-
-/** Escala máxima del canvas en pantallas HiDPI (retina). Más alta = más nítido pero más costoso. */
-export const MAX_RENDER_SCALE = 2;

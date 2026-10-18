@@ -31,12 +31,17 @@ Los ES modules no cargan desde `file://`, así que sirve la carpeta con cualquie
 python3 -m http.server 8000
 ```
 
-y abre http://localhost:8000. Parámetros útiles: `?silencio` arranca sin audio, `?fase=N` empieza en la fase N `?debug` expone el juego en la consola como `window.xwing` y `?nofx` desactiva el post-procesado WebGL.
+y abre http://localhost:8000. Parámetros útiles: `?silencio` arranca sin audio, `?fase=N` empieza en la fase N `?debug` expone el juego en la consola como `window.xwing`.
 
-## Gráficos
+## Gráficos: arcade retro de 16 bits
 
-- Las naves usan los PNG del juego, precalculados una vez por resolución de pantalla (nítidos en retina) con su versión de destello para los impactos y el halo rojo del Interceptor y de Vader.
-- Si el navegador tiene WebGL2, un post-procesado añade **bloom** (brillo real en láseres, motores, explosiones y superláser) y **ondas de choque** que distorsionan la imagen en torpedos y explosiones grandes. Sin WebGL2 el juego se ve igual, sin esos efectos.
+Dirección aprobada en el [documento de diseño](https://claude.ai/code/artifact/b6853482-e7e5-4908-934b-7276a5f3f0c6).
+
+- El juego se dibuja en un búfer de **480×270 píxeles** que se amplía ×2, ×3… sin suavizar (pixel perfect). La simulación sigue en 960×540 unidades; `render/pixel.js` las convierte.
+- Las naves son **pixel art dibujado por código** (`render/art/pixelArt.js`) con una paleta fija (`render/art/palette.js`), contorno automático de 1 px y versión de destello para los impactos.
+- Explosiones, chispas, láseres y anillos son pixel art; sin desenfoques, brillos ni distorsiones.
+- La interfaz HTML usa la misma cuadrícula (`--px`) y tipografías pixel (Press Start 2P y VT323).
+- Pendiente (pasos 4 y 5 del plan): el Destructor Estelar y la trinchera aún usan el dibujo vectorial anterior.
 
 ## Pruebas
 
@@ -65,8 +70,8 @@ js/
 │   ├── entities/        # Player, Enemy, Bullet, Torpedo, PowerUp
 │   └── bosses/          # Boss (base), TieAdvanced, StarDestroyer, DeathStar, registry
 ├── render/              # Canvas: mundo, jefes, partículas, efectos, fondo
-│   ├── art/SpriteCache.js  # Sprites precalculados de los PNG (alta calidad, destello, halo)
-│   ├── post/            # PostFX (WebGL2): bloom y ondas de choque sobre el canvas 2D
+│   ├── art/             # Pixel art por código: paleta, naves y SpriteCache (contorno, destello)
+│   ├── pixel.js         # Primitivas en píxeles enteros del búfer de 480×270
 │   └── feedback.js      # Traduce eventos de la simulación a efectos y sonido
 └── ui/                  # Cabina en HTML+CSS
     ├── viewModel.js     # Funciones puras: qué mostrar (probadas en Node)
