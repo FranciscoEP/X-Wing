@@ -1,5 +1,6 @@
 import { BOSS, BOSS_TYPES, BULLET, CANVAS } from '../../config.js';
 import { overlaps, rand } from '../../core/utils.js';
+import { interceptAngle } from '../ai/aim.js';
 import { Bullet } from '../entities/Bullet.js';
 import { Entity } from '../entities/Entity.js';
 
@@ -77,6 +78,11 @@ export class Boss extends Entity {
     return overlaps(rect, this) ? HIT.DAMAGE : null;
   }
 
+  /** Contacto físico con el casco (para chocar con el jugador), con o sin blindaje. */
+  collides(rect) {
+    return this.hitTest(rect) !== null;
+  }
+
   /** Devuelve true si el daño inició la secuencia de destrucción. */
   takeDamage(amount) {
     if (!this.vulnerable) return false;
@@ -91,9 +97,14 @@ export class Boss extends Entity {
     return false;
   }
 
+  /** Rapidez real de sus balas: la dificultad acelera el fuego hasta un límite. */
+  bulletSpeed(speed = BULLET.ENEMY_SPEED) {
+    return speed * Math.min(MAX_FIRE_SPEED_FACTOR, this.difficulty.enemyFire);
+  }
+
   /** Dispara `count` balas repartidas en un abanico de `spread` radianes centrado en `angle`. */
   fireSpread(world, x, y, angle, { count = 1, spread = 0, speed = BULLET.ENEMY_SPEED, color = null, size = 3 } = {}) {
-    const s = speed * Math.min(MAX_FIRE_SPEED_FACTOR, this.difficulty.enemyFire);
+    const s = this.bulletSpeed(speed);
     for (let i = 0; i < count; i++) {
       const a = count === 1 ? angle : angle - spread / 2 + (spread * i) / (count - 1);
       world.spawnEnemyBullet(
@@ -108,7 +119,9 @@ export class Boss extends Entity {
     }
   }
 
-  angleTo(target, x = this.x, y = this.cy) {
-    return Math.atan2(target.cy - y, target.cx - x);
+  /** Como fireSpread, pero apuntando a donde estará el jugador (puntería predictiva). */
+  fireAt(world, x, y, opts = {}) {
+    const angle = interceptAngle({ x, y }, world.player, this.bulletSpeed(opts.speed), this.difficulty.aimLead);
+    this.fireSpread(world, x, y, angle, opts);
   }
 }

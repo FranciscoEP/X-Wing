@@ -4,6 +4,7 @@ import { BOSS_TYPES, DIFFICULTIES, ENEMY_TYPES, PHASE_TYPE, PHASES, POWERUPS } f
 import { BOSS_RENDERERS } from '../js/render/bosses.js';
 import { BOSS_CLASSES } from '../js/sim/bosses/registry.js';
 import { POWERUP_EFFECTS } from '../js/sim/powerups.js';
+import { FORMATIONS } from '../js/sim/ai/formations.js';
 
 // Una errata en config.js rompía el juego en tiempo de ejecución; estas pruebas la detectan antes.
 describe('integridad de config.js', () => {
@@ -12,7 +13,12 @@ describe('integridad de config.js', () => {
       assert.ok(Object.values(PHASE_TYPE).includes(phase.type), `tipo inválido en ${phase.name}`);
       if (phase.type === PHASE_TYPE.WAVE) {
         assert.ok(ENEMY_TYPES[phase.enemy], `enemigo ${phase.enemy}`);
-        assert.ok(phase.count > 0 && phase.spawnEvery > 0);
+        assert.ok(phase.count > 0 && phase.squadronEvery > 0);
+        assert.ok(phase.squadrons.length > 0);
+        for (const sq of phase.squadrons) {
+          assert.ok(FORMATIONS.includes(sq.formation), `formación ${sq.formation}`);
+          assert.ok(sq.size > 0);
+        }
       } else {
         assert.ok(BOSS_TYPES[phase.boss], `jefe ${phase.boss}`);
       }
@@ -36,6 +42,10 @@ describe('integridad de config.js', () => {
   it('las dificultades son coherentes (más difícil = menos vidas)', () => {
     assert.ok(DIFFICULTIES.EASY.lives > DIFFICULTIES.NORMAL.lives);
     assert.ok(DIFFICULTIES.NORMAL.lives > DIFFICULTIES.HARD.lives);
-    for (const d of Object.values(DIFFICULTIES)) assert.ok(d.lives > 0 && d.dropRate >= 0 && d.dropRate <= 1);
+    assert.ok(DIFFICULTIES.EASY.aimLead < DIFFICULTIES.HARD.aimLead, 'la IA apunta mejor en difícil');
+    for (const d of Object.values(DIFFICULTIES)) {
+      assert.ok(d.lives > 0 && d.dropRate >= 0 && d.dropRate <= 1);
+      assert.ok(d.aimLead >= 0 && d.aimLead <= 1 && d.dodge >= 0);
+    }
   });
 });

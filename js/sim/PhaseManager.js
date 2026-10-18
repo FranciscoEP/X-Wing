@@ -56,6 +56,7 @@ export class PhaseManager {
     this.resolved = 0; // destruidos + escapados
     this.killed = 0;
     this.spawnTimer = 0;
+    this.squadronIndex = 0;
     this.damageTaken = 0;
   }
 
@@ -80,15 +81,20 @@ export class PhaseManager {
     }
   }
 
-  /** Devuelve true cuando toca generar otro enemigo de la oleada. */
-  shouldSpawnWaveEnemy(dt) {
+  /**
+   * Devuelve el siguiente escuadrón ({ formation, size }) cuando toca generarlo, o null.
+   * Recorre `phase.squadrons` en ciclo y recorta el último para no pasar de `count`.
+   */
+  nextSquadron(dt) {
     const p = this.phase;
-    if (!this.isActive || p.type !== PHASE_TYPE.WAVE || this.spawned >= p.count) return false;
+    if (!this.isActive || p.type !== PHASE_TYPE.WAVE || this.spawned >= p.count) return null;
     this.spawnTimer -= dt;
-    if (this.spawnTimer > 0) return false;
-    this.spawnTimer = p.spawnEvery;
-    this.spawned++;
-    return true;
+    if (this.spawnTimer > 0) return null;
+    this.spawnTimer = p.squadronEvery;
+    const spec = p.squadrons[this.squadronIndex++ % p.squadrons.length];
+    const size = Math.min(spec.size, p.count - this.spawned);
+    this.spawned += size;
+    return { ...spec, size };
   }
 
   recordDamage(amount) {

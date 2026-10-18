@@ -1,13 +1,14 @@
 import { rand } from '../core/utils.js';
 import { LASER, LASER_STATE, RADIUS } from '../sim/bosses/DeathStar.js';
 import { TURRETS } from '../sim/bosses/StarDestroyer.js';
+import { CHARGE, VADER_MODE } from '../sim/bosses/TieAdvanced.js';
 
 /**
  * Dibujo de cada jefe, indexado por `boss.type`. `body` va bajo el jugador y `overlay` encima.
  * Para un jefe nuevo, añade aquí su entrada.
  */
 export const BOSS_RENDERERS = {
-  TIE_ADVANCED: { body: drawTieAdvanced, filter: 'brightness(0.7) contrast(1.3)' },
+  TIE_ADVANCED: { body: drawTieAdvanced, overlay: drawVaderOverlay, filter: 'brightness(0.7) contrast(1.3)' },
   STAR_DESTROYER: { body: drawStarDestroyer },
   DEATH_STAR: { body: drawDeathStar, overlay: drawSuperlaser },
 };
@@ -27,9 +28,48 @@ export function drawBossOverlay(ctx, boss, assets) {
 }
 
 function drawTieAdvanced(ctx, boss, { images }) {
+  // Estela durante la embestida
+  if (boss.mode === VADER_MODE.CHARGE) {
+    const trail = ctx.createLinearGradient(boss.x + boss.width, 0, boss.x + boss.width + 160, 0);
+    trail.addColorStop(0, 'rgba(255, 60, 60, 0.6)');
+    trail.addColorStop(1, 'rgba(255, 60, 60, 0)');
+    ctx.fillStyle = trail;
+    ctx.fillRect(boss.x + boss.width / 2, boss.y + boss.height * 0.3, 160 + boss.width / 2, boss.height * 0.4);
+  }
+  const windup = boss.mode === VADER_MODE.WINDUP;
   ctx.shadowColor = '#ff2e2e';
-  ctx.shadowBlur = 18;
+  ctx.shadowBlur = windup ? 40 : 18;
   if (images.tie) ctx.drawImage(images.tie, boss.x, boss.y, boss.width, boss.height);
+}
+
+/** Aviso de embestida (franja roja) y escudo deflector, por encima del jugador. */
+function drawVaderOverlay(ctx, boss, { time }) {
+  if (boss.dying) return;
+  if (boss.mode === VADER_MODE.WINDUP) {
+    const p = 1 - boss.modeTimer / CHARGE.WINDUP;
+    ctx.save();
+    ctx.fillStyle = `rgba(255, 40, 40, ${0.08 + 0.12 * p})`;
+    ctx.fillRect(0, boss.chargeY, boss.x, boss.height);
+    ctx.strokeStyle = `rgba(255, 60, 60, ${0.4 + 0.4 * Math.abs(Math.sin(time * 18))})`;
+    ctx.setLineDash([14, 10]);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, boss.chargeY, boss.x, boss.height);
+    ctx.restore();
+  }
+  if (boss.shielded) {
+    ctx.save();
+    ctx.globalAlpha = 0.35 + 0.15 * Math.sin(time * 10);
+    ctx.strokeStyle = '#ff5c5c';
+    ctx.fillStyle = 'rgba(255, 80, 80, 0.12)';
+    ctx.lineWidth = 3;
+    ctx.shadowColor = '#ff2e2e';
+    ctx.shadowBlur = 20;
+    ctx.beginPath();
+    ctx.ellipse(boss.cx, boss.cy, boss.width * 0.7, boss.height * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawStarDestroyer(ctx, boss, { time }) {

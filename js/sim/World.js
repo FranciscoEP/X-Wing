@@ -2,6 +2,7 @@ import { COMBAT, PHASE_TYPE, POWERUPS, SCORE, TORPEDO } from '../config.js';
 import { EventBus } from '../core/EventBus.js';
 import { random } from '../core/random.js';
 import { centerOf, distance, prune, weightedPick } from '../core/utils.js';
+import { spawnSquadron } from './ai/formations.js';
 import { createBoss } from './bosses/registry.js';
 import { resolveCollisions } from './collisions.js';
 import { Enemy } from './entities/Enemy.js';
@@ -18,7 +19,7 @@ export const OUTCOME = { VICTORY: 'victory', DEFEAT: 'defeat' };
  *
  * Eventos: shot, enemyHit, enemyDestroyed, enemyEscaped, bossHit, armorHit, bossDying,
  * bossDestroyed, explosion, shieldBlock, playerHit, playerDestroyed, playerRespawn,
- * powerUpCollected, torpedoLaunched, torpedoBlast, superlaser, scored, phaseStart, phaseClear, gameOver.
+ * powerUpCollected, torpedoLaunched, torpedoBlast, superlaser, enemyDodge, enemyDive, bossStage, scored, phaseStart, phaseClear, gameOver.
  */
 export class World {
   constructor({ difficulty, events = new EventBus() }) {
@@ -34,6 +35,7 @@ export class World {
     this.score = 0;
     this.respawnTimer = 0;
     this.outcome = null;
+    this.stats = { time: 0, shotsFired: 0, shotsHit: 0, kills: 0, damageTaken: 0, torpedoes: 0 };
     this.phases = new PhaseManager({
       onPhaseStart: (phase) => this.onPhaseStart(phase),
       onPhaseClear: (phase, flawless) => this.onPhaseClear(phase, flawless),
@@ -56,13 +58,15 @@ export class World {
   /** Avanza la simulación `dt` segundos. `controls`: { moveX, moveY, shoot, torpedo }. */
   update(dt, controls = {}) {
     if (this.isOver) return;
+    this.stats.time += dt;
     this.phases.update(dt);
 
     this.player.update(dt, controls);
     if (controls.shoot) this.playerShoot();
     if (controls.torpedo) this.launchTorpedo();
 
-    if (this.phases.shouldSpawnWaveEnemy(dt)) this.spawnEnemy(this.phases.phase.enemy, { fromWave: true });
+    const squadron = this.phases.nextSquadron(dt);
+    if (squadron) spawnSquadron(this, this.phases.phase.enemy, squadron);
 
     for (const e of this.enemies) e.update(dt, this);
     for (const b of this.playerBullets) b.update(dt);
@@ -92,6 +96,7 @@ export class World {
     const { player } = this;
     if (!player.canBeHit) return;
     this.phases.recordDamage(amount);
+    this.stats.damageTaken += amount;
     const destroyed = player.takeDamage(amount);
     if (!silent) this.emit('playerHit', { amount });
     if (destroyed) {
@@ -106,6 +111,7 @@ export class World {
     const shots = this.player.tryShoot();
     if (!shots.length) return;
     this.playerBullets.push(...shots);
+    this.stats.shotsFired += shots.length;
     this.emit('shot');
   }
 
@@ -113,6 +119,7 @@ export class World {
     const torpedo = this.player.launchTorpedo();
     if (!torpedo) return;
     this.torpedoes.push(torpedo);
+    this.stats.torpedoes++;
     this.emit('torpedoLaunched', { x: torpedo.cx, y: torpedo.cy });
   }
 
@@ -136,6 +143,7 @@ export class World {
 
   hitEnemy(enemy, damage) {
     if (!enemy.takeDamage(damage)) return;
+    this.stats.kills++;
     this.emit('enemyDestroyed', { x: enemy.cx, y: enemy.cy, enemy });
     this.addScore(enemy.score, { x: enemy.cx, y: enemy.y });
     if (random() < this.difficulty.dropRate) {
@@ -149,6 +157,16 @@ export class World {
     this.addScore(boss.score, { x: boss.cx, y: boss.cy });
     this.enemyBullets.length = 0;
     this.emit('bossDying', { boss });
+  }
+
+  /** Un láser del jugador alcanzó un objetivo (para la precisión). */
+  recordHit() {
+    this.stats.shotsHit++;
+  }
+
+  /** Precisión 0..1 de los láseres del jugador. */
+  get accuracy() {
+    return this.stats.shotsFired ? this.stats.shotsHit / this.stats.shotsFired : 0;
   }
 
   collectPowerUp(powerUp) {

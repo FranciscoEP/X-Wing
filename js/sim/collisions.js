@@ -36,6 +36,7 @@ function playerBulletsVsEnemies(world) {
     const enemy = world.enemies.find((e) => !e.dead && overlaps(bullet, shrink(e, HITBOX.ENEMY_VS_BULLET)));
     if (!enemy) continue;
     bullet.dead = true;
+    world.recordHit();
     world.emit('enemyHit', { x: bullet.cx, y: bullet.cy });
     world.hitEnemy(enemy, bullet.damage);
   }
@@ -52,6 +53,7 @@ function playerBulletsVsBoss(world) {
     if (hit === HIT.ARMOR) {
       world.emit('armorHit', { x: bullet.cx, y: bullet.cy });
     } else {
+      world.recordHit();
       world.emit('bossHit', { x: bullet.cx, y: bullet.cy });
       world.hitBoss(bullet.damage);
     }
@@ -80,7 +82,7 @@ function enemiesVsPlayer(world) {
 
 function bossVsPlayer(world) {
   const { boss, player } = world;
-  if (boss?.vulnerable && boss.hitTest(player.hitbox(HITBOX.PLAYER_VS_BOSS)) === HIT.DAMAGE) {
+  if (boss?.vulnerable && boss.collides(player.hitbox(HITBOX.PLAYER_VS_BOSS))) {
     world.damagePlayer(COMBAT.BOSS_CONTACT_DAMAGE);
   }
 }

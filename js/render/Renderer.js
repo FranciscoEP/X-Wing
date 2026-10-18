@@ -1,6 +1,4 @@
 import { CANVAS } from '../config.js';
-import { buildHudModel, drawHUD } from '../ui/HUD.js';
-import { drawBanner, drawEnd, drawMenu, drawPause } from '../ui/Screens.js';
 import { Background } from './Background.js';
 import { drawBoss, drawBossOverlay } from './bosses.js';
 import { Effects } from './Effects.js';
@@ -10,7 +8,10 @@ import { Particles } from './Particles.js';
 
 export const SCENE = { MENU: 'menu', PLAYING: 'playing', PAUSED: 'paused', GAME_OVER: 'gameover', VICTORY: 'victory' };
 
-/** Dibuja el mundo y las pantallas. Mantiene solo estado visual (partículas, sacudida, fondo). */
+/**
+ * Dibuja el mundo en el canvas. Menús, HUD y carteles son HTML+CSS (ui/CockpitUI.js).
+ * Mantiene solo estado visual: partículas, sacudida y fondo.
+ */
 export class Renderer {
   constructor(ctx, images) {
     this.ctx = ctx;
@@ -33,7 +34,7 @@ export class Renderer {
     this.effects.update(dt);
   }
 
-  /** `scene`: { state, time, world, highScore, newRecord, muted, difficulty }. */
+  /** `scene`: { state, time, world, ... } (ver Game.scene()). */
   render(scene) {
     const { ctx } = this;
     ctx.save();
@@ -42,7 +43,6 @@ export class Renderer {
     if (scene.state !== SCENE.MENU && scene.world) this.drawWorld(scene.world, scene.time);
     ctx.restore();
     this.effects.drawFlash(ctx, CANVAS.WIDTH, CANVAS.HEIGHT);
-    this.drawOverlay(scene);
   }
 
   drawWorld(world, time) {
@@ -57,26 +57,5 @@ export class Renderer {
     for (const b of world.enemyBullets) drawBullet(ctx, b);
     if (world.boss) drawBossOverlay(ctx, world.boss, assets);
     this.particles.draw(ctx);
-  }
-
-  drawOverlay(scene) {
-    const { ctx, images } = this;
-    switch (scene.state) {
-      case SCENE.MENU:
-        drawMenu(ctx, scene);
-        break;
-      case SCENE.PLAYING:
-        drawHUD(ctx, buildHudModel(scene.world, scene), images);
-        drawBanner(ctx, scene.world.phases);
-        break;
-      case SCENE.PAUSED:
-        drawHUD(ctx, buildHudModel(scene.world, scene), images);
-        drawPause(ctx);
-        break;
-      case SCENE.GAME_OVER:
-      case SCENE.VICTORY:
-        drawEnd(ctx, { ...scene, victory: scene.state === SCENE.VICTORY, score: scene.world.score });
-        break;
-    }
   }
 }

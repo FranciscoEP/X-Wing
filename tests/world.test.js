@@ -37,6 +37,15 @@ describe('World: partida completa', () => {
     });
   }
 
+  it('10 semillas distintas: ninguna partida se queda atascada', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      useSeed(seed);
+      const world = makeWorld({ phase: 0 });
+      run(world, 900, autopilot);
+      assert.equal(world.outcome, OUTCOME.VICTORY, `semilla ${seed}: atascada en fase ${world.phases.number}`);
+    }
+  });
+
   it('regresión: un jugador que no hace nada termina perdiendo', () => {
     const world = makeWorld({ difficulty: DIFFICULTIES.HARD, phase: 0 });
     run(world, 600);
@@ -97,5 +106,22 @@ describe('World: oleadas y puntuación', () => {
     const before = world.score;
     world.phases.clear();
     assert.equal(world.score - before, SCORE.PHASE_CLEAR + SCORE.NO_DAMAGE);
+  });
+});
+
+describe('World: estadísticas', () => {
+  it('cuenta disparos, aciertos, derribos y daño recibido', () => {
+    const world = makeWorld({ phase: 0 });
+    run(world, 60, autopilot);
+    const { stats } = world;
+    assert.ok(stats.shotsFired > 0 && stats.shotsHit > 0 && stats.kills > 0);
+    assert.ok(stats.shotsHit <= stats.shotsFired);
+    assert.ok(world.accuracy > 0 && world.accuracy <= 1);
+    assert.ok(stats.time > 59);
+    world.player.invulnerable = 0;
+    world.player.powerUps = {};
+    const before = stats.damageTaken;
+    world.damagePlayer(10);
+    assert.equal(stats.damageTaken - before, 10);
   });
 });

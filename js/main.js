@@ -5,6 +5,7 @@ import { Input } from './core/Input.js';
 import { Storage } from './core/storage.js';
 import { Game } from './Game.js';
 import { Renderer } from './render/Renderer.js';
+import { CockpitUI } from './ui/CockpitUI.js';
 
 // Único punto de contacto con el DOM: construye las dependencias y se las pasa a Game.
 
@@ -40,6 +41,7 @@ async function boot() {
   ]);
 
   const storage = new Storage();
+  const viewport = document.getElementById('viewport');
   const game = new Game({
     input: new Input(window),
     // `?silencio` arranca sin audio (útil para pruebas)
@@ -49,11 +51,25 @@ async function boot() {
     startPhase: startPhaseFromUrl(),
   });
 
+  game.ui = new CockpitUI(viewport, {
+    playerIcon: ASSETS.images.player,
+    actions: {
+      start: () => game.retry(),
+      resume: () => game.resume(),
+      menu: () => game.toMenu(),
+      selectDifficulty: (key) => game.selectDifficulty(key),
+    },
+    // Tras usar el ratón, el foco vuelve al canvas: así Espacio dispara en vez de pulsar el botón
+    onAction: () => canvas.focus(),
+  });
+
+  // `?debug` expone el juego en la consola (window.xwing) para pruebas manuales
+  if (params.has('debug')) window.xwing = game;
+
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) game.pause();
   });
   setupMuteButton(game, canvas);
-  document.body.classList.add('ready');
   canvas.focus();
   game.start();
 }

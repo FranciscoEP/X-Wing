@@ -41,7 +41,7 @@ export class StarDestroyer extends Boss {
       const t = TURRETS[Math.floor(rand(0, TURRETS.length))];
       const tx = this.x + t.u * this.width;
       const ty = this.y + t.v * this.height;
-      this.fireSpread(world, tx, ty, this.angleTo(world.player, tx, ty), { count: this.enraged ? 3 : 1, spread: AI.TURRET_SPREAD });
+      this.fireAt(world, tx, ty, { count: this.enraged ? 3 : 1, spread: AI.TURRET_SPREAD });
     }
 
     this.broadsideTimer -= dt;

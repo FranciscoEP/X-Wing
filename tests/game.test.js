@@ -6,7 +6,7 @@ import { MemoryBackend, Storage } from '../js/core/storage.js';
 import { Game } from '../js/Game.js';
 import { SCENE } from '../js/render/Renderer.js';
 import { OUTCOME } from '../js/sim/World.js';
-import { buildHudModel } from '../js/ui/HUD.js';
+import { buildHudModel } from '../js/ui/viewModel.js';
 import { DT, FakeEventTarget, resetRandomSource, useSeed } from './helpers.js';
 
 beforeEach(() => useSeed());

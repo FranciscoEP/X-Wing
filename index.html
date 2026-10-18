@@ -3,26 +3,121 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#02040c" />
     <title>X-Wing: Asalto a la Estrella de la Muerte</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
-    <main>
-      <div class="frame">
+    <main class="cockpit">
+      <div class="viewport" id="viewport" data-state="loading">
         <canvas id="game" tabindex="0" aria-label="Juego X-Wing"></canvas>
-        <p class="loading">Cargando…</p>
+
+        <!-- HUD de la cabina (visible jugando y en pausa) -->
+        <div class="hud" aria-hidden="false">
+          <section class="panel hud-hull" aria-label="Estado de la nave">
+            <div class="hud-row">
+              <span class="label">Casco</span>
+              <div class="meter meter-hull" data-ref="hull" role="meter" aria-label="Casco" aria-valuemin="0" aria-valuemax="100">
+                <span class="meter-fill"></span>
+              </div>
+            </div>
+            <div class="hud-row">
+              <span class="label">Naves</span>
+              <span class="lives" data-ref="lives"></span>
+            </div>
+            <div class="hud-row">
+              <span class="label">Torpedos</span>
+              <span class="pips" data-ref="torpedoes"></span>
+              <kbd class="hint">K</kbd>
+            </div>
+          </section>
+
+          <section class="hud-center" aria-live="off">
+            <p class="phase-label" data-ref="phase"></p>
+            <div class="boss" data-ref="boss" hidden>
+              <p class="boss-name" data-ref="bossName"></p>
+              <div class="meter meter-boss"><span class="meter-fill" data-ref="bossFill"></span></div>
+            </div>
+            <div class="wave" data-ref="wave" hidden>
+              <div class="meter meter-wave"><span class="meter-fill" data-ref="waveFill"></span></div>
+              <p class="wave-count" data-ref="waveCount"></p>
+            </div>
+          </section>
+
+          <section class="panel hud-score" aria-label="Puntuación">
+            <p class="score" data-ref="score">0000000</p>
+            <p class="record">Récord <span data-ref="highScore">0000000</span></p>
+          </section>
+
+          <ul class="powerups" data-ref="powerUps" aria-label="Sistemas activos"></ul>
+          <div class="alerts" data-ref="alerts" aria-live="polite"></div>
+        </div>
+
+        <!-- Cartel de fase -->
+        <div class="banner" data-ref="banner" hidden>
+          <p class="banner-kicker" data-ref="bannerKicker"></p>
+          <h2 class="banner-title" data-ref="bannerTitle"></h2>
+          <p class="banner-subtitle" data-ref="bannerSubtitle"></p>
+        </div>
+
+        <!-- Menú principal -->
+        <section class="screen screen-menu" aria-labelledby="menu-title">
+          <div class="menu-brand">
+            <p class="eyebrow">Alianza Rebelde · Escuadrón Rojo</p>
+            <h1 id="menu-title" class="logo">X-WING</h1>
+            <p class="tagline">Asalto a la Estrella de la Muerte</p>
+          </div>
+          <div class="panel menu-panel">
+            <p class="label" id="difficulty-label">Rango de piloto</p>
+            <div class="difficulties" role="radiogroup" aria-labelledby="difficulty-label" data-ref="difficulties"></div>
+            <button class="btn btn-primary" type="button" data-action="start">Despegar <kbd>Enter</kbd></button>
+            <p class="menu-record" data-ref="menuRecord"></p>
+          </div>
+        </section>
+
+        <!-- Pausa -->
+        <section class="screen screen-pause" aria-labelledby="pause-title">
+          <div class="panel dialog">
+            <h2 id="pause-title" class="dialog-title">Pausa</h2>
+            <div class="actions">
+              <button class="btn btn-primary" type="button" data-action="resume">Continuar <kbd>P</kbd></button>
+              <button class="btn" type="button" data-action="menu">Abandonar misión <kbd>Q</kbd></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Fin de partida -->
+        <section class="screen screen-end" aria-labelledby="end-title">
+          <div class="panel dialog dialog-end">
+            <h2 id="end-title" class="dialog-title" data-ref="endTitle"></h2>
+            <p class="dialog-subtitle" data-ref="endSubtitle"></p>
+            <p class="end-score" data-ref="endScore"></p>
+            <p class="end-record" data-ref="endRecord"></p>
+            <dl class="stats" data-ref="endStats"></dl>
+            <div class="actions">
+              <button class="btn btn-primary" type="button" data-action="start">Volver a volar <kbd>Enter</kbd></button>
+              <button class="btn" type="button" data-action="menu">Menú</button>
+            </div>
+          </div>
+        </section>
+
+        <p class="loading">Calibrando sistemas…</p>
+        <div class="scanlines" aria-hidden="true"></div>
       </div>
-      <ul class="controls">
-        <li><kbd>WASD</kbd>/<kbd>←↑↓→</kbd> mover</li>
-        <li><kbd>J</kbd>/<kbd>Espacio</kbd> disparar</li>
-        <li><kbd>K</kbd> torpedo</li>
-        <li><kbd>P</kbd>/<kbd>Esc</kbd> pausa</li>
-        <li><kbd>M</kbd> sonido</li>
-        <li><button id="mute-button" type="button" aria-pressed="false">🔊 Sonido: sí</button></li>
-      </ul>
+
+      <footer class="console">
+        <ul class="controls">
+          <li><kbd>WASD</kbd><kbd>←↑↓→</kbd> mover</li>
+          <li><kbd>J</kbd><kbd>Espacio</kbd> disparar</li>
+          <li><kbd>K</kbd> torpedo</li>
+          <li><kbd>P</kbd><kbd>Esc</kbd> pausa</li>
+          <li><kbd>M</kbd> sonido</li>
+        </ul>
+        <button id="mute-button" class="btn btn-small" type="button" aria-pressed="false">🔊 Sonido: sí</button>
+      </footer>
     </main>
     <script type="module" src="js/main.js"></script>
   </body>

@@ -13,10 +13,11 @@ const MAX_DT = 1 / 30; // evita saltos enormes tras cambiar de pestaña
  * por eso se puede probar con dobles.
  */
 export class Game {
-  constructor({ input, audio, renderer, storage, startPhase = 0 }) {
+  constructor({ input, audio, renderer, storage, ui = null, startPhase = 0 }) {
     this.input = input;
     this.audio = audio;
     this.renderer = renderer;
+    this.ui = ui;
     this.storage = storage;
     this.startPhase = startPhase;
 
@@ -47,7 +48,9 @@ export class Game {
   /** Un frame completo: lógica + dibujo. */
   step(dt) {
     this.update(dt);
-    this.renderer?.render(this.scene());
+    const scene = this.scene();
+    this.renderer?.render(scene);
+    this.ui?.update(scene);
     this.input.endFrame();
   }
 
@@ -64,7 +67,7 @@ export class Game {
         this.world.update(dt, this.input.readControls());
         break;
       case SCENE.PAUSED:
-        if (this.input.consume(KEYS.PAUSE)) this.state = SCENE.PLAYING;
+        if (this.input.consume(KEYS.PAUSE)) this.resume();
         else if (this.input.consume(KEYS.QUIT)) this.toMenu();
         return; // en pausa no avanza nada, ni siquiera el fondo
       case SCENE.GAME_OVER:
@@ -92,15 +95,20 @@ export class Game {
   updateMenu() {
     const i = DIFFICULTY_KEYS.indexOf(this.difficultyKey);
     const n = DIFFICULTY_KEYS.length;
-    if (this.input.consume(KEYS.UP)) this.difficultyKey = DIFFICULTY_KEYS[(i + n - 1) % n];
-    if (this.input.consume(KEYS.DOWN)) this.difficultyKey = DIFFICULTY_KEYS[(i + 1) % n];
+    if (this.input.consume(KEYS.UP)) this.selectDifficulty(DIFFICULTY_KEYS[(i + n - 1) % n]);
+    if (this.input.consume(KEYS.DOWN)) this.selectDifficulty(DIFFICULTY_KEYS[(i + 1) % n]);
     if (this.input.consume(KEYS.CONFIRM) || this.input.consume(KEYS.SHOOT)) this.startRun();
+  }
+
+  selectDifficulty(key) {
+    if (this.state === SCENE.MENU && DIFFICULTIES[key]) this.difficultyKey = key;
   }
 
   startRun() {
     const events = new EventBus();
     this.world = new World({ difficulty: this.difficulty, events });
     this.renderer?.attach(this.world);
+    this.ui?.attach(this.world);
     bindAudioFeedback(events, this.audio);
     events.on('gameOver', ({ outcome }) => this.endRun(outcome));
 
@@ -114,6 +122,10 @@ export class Game {
     if (this.state === SCENE.PLAYING) this.state = SCENE.PAUSED;
   }
 
+  resume() {
+    if (this.state === SCENE.PAUSED) this.state = SCENE.PLAYING;
+  }
+
   endRun(outcome) {
     this.state = outcome === OUTCOME.VICTORY ? SCENE.VICTORY : SCENE.GAME_OVER;
     if (this.world.score > this.highScore) {
@@ -122,6 +134,11 @@ export class Game {
       this.newRecord = true;
     }
     this.audio.stopMusic();
+  }
+
+  /** Desde el fin de partida (o el menú) vuelve a empezar con la dificultad elegida. */
+  retry() {
+    if (this.state !== SCENE.PLAYING && this.state !== SCENE.PAUSED) this.startRun();
   }
 
   toMenu() {

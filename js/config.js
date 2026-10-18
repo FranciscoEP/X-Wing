@@ -74,17 +74,28 @@ export const COMBAT = {
   RESPAWN_DELAY: 1.5,
 };
 
+/**
+ * aimLead: cuánto anticipa la IA el movimiento del jugador al apuntar (0 = dispara a donde está,
+ * 1 = intercepción perfecta). dodge: multiplica la probabilidad de esquivar de cada enemigo.
+ */
 export const DIFFICULTIES = {
-  EASY: { label: 'Piloto Novato', lives: 5, enemySpeed: 0.8, enemyFire: 0.7, bossHp: 0.7, dropRate: 0.25 },
-  NORMAL: { label: 'Piloto Rebelde', lives: 3, enemySpeed: 1, enemyFire: 1, bossHp: 1, dropRate: 0.15 },
-  HARD: { label: 'As de la Alianza', lives: 2, enemySpeed: 1.3, enemyFire: 1.4, bossHp: 1.5, dropRate: 0.1 },
+  EASY: { label: 'Piloto Novato', lives: 5, enemySpeed: 0.8, enemyFire: 0.7, bossHp: 0.7, dropRate: 0.25, aimLead: 0.25, dodge: 0.4 },
+  NORMAL: { label: 'Piloto Rebelde', lives: 3, enemySpeed: 1, enemyFire: 1, bossHp: 1, dropRate: 0.15, aimLead: 0.7, dodge: 0.8 },
+  HARD: { label: 'As de la Alianza', lives: 2, enemySpeed: 1.3, enemyFire: 1.4, bossHp: 1.5, dropRate: 0.1, aimLead: 1, dodge: 1 },
 };
 export const DEFAULT_DIFFICULTY = 'NORMAL';
 
+/**
+ * dodge.chance: probabilidad de intentar esquivar un láser que viene hacia él (× DIFFICULTY.dodge).
+ * dodge.reaction: segundos de antelación con que detecta el láser. dodge.cooldown: pausa entre esquivas.
+ */
 export const ENEMY_TYPES = {
-  TIE_FIGHTER: { hp: 20, speed: 140, fireRate: 0.5, score: 100, size: 56, wobble: 30 },
-  TIE_INTERCEPTOR: { hp: 30, speed: 220, fireRate: 0.8, score: 150, size: 50, wobble: 70 },
+  TIE_FIGHTER: { hp: 20, speed: 140, fireRate: 0.5, score: 100, size: 56, wobble: 30, dodge: { chance: 0.15, reaction: 0.3, speed: 220, cooldown: 1.5 } },
+  TIE_INTERCEPTOR: { hp: 30, speed: 220, fireRate: 0.8, score: 150, size: 50, wobble: 50, dodge: { chance: 0.55, reaction: 0.35, speed: 320, cooldown: 0.9 } },
 };
+
+/** Formaciones de escuadrón (ver sim/ai/formations.js). */
+export const FORMATION = { V: 'V', COLUMN: 'COLUMN', PINCER: 'PINCER', DIVE: 'DIVE' };
 
 export const BOSS = {
   ENTRY_SPEED: 160,
@@ -99,10 +110,36 @@ export const BOSS_TYPES = {
 
 export const PHASE_TYPE = { WAVE: 'WAVE', BOSS: 'BOSS' };
 
+/** Las oleadas llegan en escuadrones: se recorre `squadrons` en ciclo hasta generar `count` enemigos. */
 export const PHASES = [
-  { type: PHASE_TYPE.WAVE, name: 'Escuadrón TIE', objective: 'Destruye 20 TIE Fighters', enemy: 'TIE_FIGHTER', count: 20, spawnEvery: 0.9 },
+  {
+    type: PHASE_TYPE.WAVE,
+    name: 'Escuadrón TIE',
+    objective: 'Destruye 20 TIE Fighters',
+    enemy: 'TIE_FIGHTER',
+    count: 20,
+    squadronEvery: 3.2,
+    squadrons: [
+      { formation: FORMATION.V, size: 5 },
+      { formation: FORMATION.COLUMN, size: 4 },
+      { formation: FORMATION.PINCER, size: 4 },
+    ],
+  },
   { type: PHASE_TYPE.BOSS, name: 'Darth Vader', objective: 'Derriba el TIE Advanced', boss: 'TIE_ADVANCED' },
-  { type: PHASE_TYPE.WAVE, name: 'Asalto Interceptor', objective: 'Destruye 30 Interceptores', enemy: 'TIE_INTERCEPTOR', count: 30, spawnEvery: 0.7 },
+  {
+    type: PHASE_TYPE.WAVE,
+    name: 'Asalto Interceptor',
+    objective: 'Destruye 30 Interceptores',
+    enemy: 'TIE_INTERCEPTOR',
+    count: 30,
+    squadronEvery: 2.8,
+    squadrons: [
+      { formation: FORMATION.DIVE, size: 3 },
+      { formation: FORMATION.PINCER, size: 4 },
+      { formation: FORMATION.V, size: 5 },
+      { formation: FORMATION.DIVE, size: 4 },
+    ],
+  },
   { type: PHASE_TYPE.BOSS, name: 'Destructor Estelar', objective: 'Destruye el Star Destroyer', boss: 'STAR_DESTROYER' },
   { type: PHASE_TYPE.BOSS, name: 'Estrella de la Muerte', objective: 'Dispara al puerto de escape', boss: 'DEATH_STAR' },
 ];

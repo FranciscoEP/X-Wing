@@ -23,13 +23,19 @@ describe('PhaseManager', () => {
     assert.deepEqual(calls, [['start', PHASES[0].name]]);
   });
 
-  it('genera exactamente `count` enemigos y se supera al resolverlos todos', () => {
+  it('genera escuadrones en ciclo hasta `count` enemigos exactos y se supera al resolverlos', () => {
     const { pm, calls } = make();
     pm.start();
     pm.update(PHASE_BANNER_TIME + 0.01);
-    let spawned = 0;
-    for (let i = 0; i < 10000; i++) if (pm.shouldSpawnWaveEnemy(0.1)) spawned++;
-    assert.equal(spawned, PHASES[0].count);
+    const squadrons = [];
+    for (let i = 0; i < 10000; i++) {
+      const sq = pm.nextSquadron(0.1);
+      if (sq) squadrons.push(sq);
+    }
+    const total = squadrons.reduce((n, sq) => n + sq.size, 0);
+    assert.equal(total, PHASES[0].count);
+    assert.equal(squadrons[0].formation, PHASES[0].squadrons[0].formation, 'empieza por el primero');
+    assert.equal(squadrons[PHASES[0].squadrons.length].formation, PHASES[0].squadrons[0].formation, 'vuelve a empezar el ciclo');
     for (let i = 0; i < PHASES[0].count; i++) pm.recordWaveEnemyGone({ killed: i % 2 === 0 });
     assert.equal(pm.status, PHASE_STATUS.CLEAR);
     assert.deepEqual(calls.at(-1), ['clear', PHASES[0].name, true]);

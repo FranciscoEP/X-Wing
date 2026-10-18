@@ -93,7 +93,7 @@ describe('Player', () => {
 });
 
 describe('Enemy', () => {
-  const world = { player: new Player(3), shots: [], spawnEnemyBullet(b) { this.shots.push(b); } };
+  const world = { player: new Player(3), playerBullets: [], shots: [], emit() {}, spawnEnemyBullet(b) { this.shots.push(b); } };
 
   it('avanza hacia la izquierda, dispara al jugador y escapa', () => {
     const e = new Enemy('TIE_FIGHTER', NORMAL, { y: 200 });
